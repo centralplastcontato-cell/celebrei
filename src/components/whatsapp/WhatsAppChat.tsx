@@ -551,7 +551,7 @@ import { useDraftMessages } from "@/hooks/useDraftMessages";
 import { configureWapiWebhooks } from "@/lib/wapi-webhook-config";
 import { useInstancePermissions } from "@/hooks/useInstancePermissions";
 import { formatPhoneBR } from "@/lib/mask-utils";
-import { senderDot } from "@/lib/messageSender";
+import { senderDot, senderTag } from "@/lib/messageSender";
 import { ClientDataBar } from "./ClientDataBar";
 import { type ClientDataRequestRow, clientDataLabel, clientDataState, latestClientDataByLead } from "@/lib/clientDataRequest";
 
@@ -6497,6 +6497,8 @@ const hasCampaignReply = (conv: { bot_data?: Record<string, unknown> | null } | 
                                   (msg.message_type === 'image' || msg.message_type === 'video') && "px-2 pb-1"
                                 )}>
                                   {(() => {
+                                    const tag = senderTag(msg);
+                                    if (tag) return <span className="text-[10px] font-medium px-1.5 rounded-full bg-black/10 whitespace-nowrap">{tag}</span>;
                                     const dot = senderDot(msg);
                                     return dot && <span className={cn("w-2 h-2 rounded-full inline-block shrink-0", dot.className)} title={dot.title} />;
                                   })()}
@@ -7622,6 +7624,8 @@ const hasCampaignReply = (conv: { bot_data?: Record<string, unknown> | null } | 
                               (msg.message_type === 'image' || msg.message_type === 'video') && "px-2 pb-1"
                             )}>
                               {(() => {
+                                const tag = senderTag(msg);
+                                if (tag) return <span className="text-[10px] font-medium px-1.5 rounded-full bg-black/10 whitespace-nowrap">{tag}</span>;
                                 const dot = senderDot(msg);
                                 return dot && <span className={cn("w-2 h-2 rounded-full inline-block shrink-0", dot.className)} title={dot.title} />;
                               })()}
