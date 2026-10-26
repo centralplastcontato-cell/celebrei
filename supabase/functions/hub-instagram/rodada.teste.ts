@@ -8,7 +8,7 @@ import { configuraRecursos } from "./imagem.ts";
 import { idDoStory } from "./postai.ts";
 import { VagaOcupada, type Condicao, type Filtro, type NovoPost, type Post, type Repo } from "./repo.ts";
 import { vagasProximas } from "./pauta.ts";
-import { acaoNoPost, avancaEtapa, gravarConfig, lerConfig, listar, postDeTeste, rodada } from "./rodada.ts";
+import { acaoNoPost, avancaEtapa, gravarConfig, lerConfig, listar, manutencao, postDeTeste, rodada } from "./rodada.ts";
 
 const AQUI = new URL(".", import.meta.url).pathname;
 const wasm = Deno.env.get("INSTAGRAM_WASM");
@@ -91,7 +91,7 @@ type PostLa = { id: string; external_id: string; formato: string; horario: strin
 function internetFalsa() {
   const postai = new Map<string, PostLa>();
   const chamadas: { metodo: string; url: string; corpo?: Record<string, unknown> }[] = [];
-  const falhas = { imagem: 0, postai: 0 as number, postaiStatus: 422 };
+  const falhas = { imagem: 0, postai: 0 as number, postaiStatus: 422, modelosSumidos: [] as string[] };
   const jpeg = Deno.readFileSync(`${AQUI}../../../src/assets/espaco-carrossel-poster-interna-2.jpg`);
   let b64 = "";
   for (let i = 0; i < jpeg.length; i += 0x8000) b64 += String.fromCharCode(...jpeg.subarray(i, i + 0x8000));
@@ -122,6 +122,9 @@ function internetFalsa() {
       });
     }
     if (url.endsWith("/images/generations")) {
+      if (falhas.modelosSumidos.includes(corpo.model)) {
+        return resposta({ error: { message: `The model '${corpo.model}' does not exist.` } }, 400);
+      }
       if (falhas.imagem > 0) {
         falhas.imagem--;
         return resposta({ error: { message: "Billing hard limit has been reached" } }, 400);
@@ -306,6 +309,53 @@ Deno.test({ name: "imagem falhando 3 vezes vira 'erro' e para de tentar", ...opc
     assertEquals(p.tentativas, 3);
     assert(p.motivo?.includes("Billing"));
     await assertRejects(() => acaoNoPost(repo, "00000000-0000-0000-0000-000000000000", "aprovar"));
+  } finally {
+    net.restaura();
+  }
+});
+
+Deno.test({ name: "modelo de imagem que sumiu: usa o próximo da lista", ...opcoes }, async () => {
+  const net = ambiente();
+  try {
+    const repo = repoMemoria();
+    net.falhas.modelosSumidos = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"];
+    const r = await postDeTeste(repo);
+    const p = repo.linhas.find((x) => x.id === r.id)!;
+    assertEquals(p.status, "enviado");
+    const modelos = net.chamadas.filter((c) => c.url.endsWith("/images/generations")).map((c) => (c.corpo as { model: string }).model);
+    assertEquals(modelos, ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]);
+  } finally {
+    net.falhas.modelosSumidos = [];
+    net.restaura();
+  }
+});
+
+Deno.test({ name: "'erro' ganha nova rodada de tentativas depois de 3 h se o horário estiver longe", ...opcoes }, async () => {
+  const net = ambiente();
+  try {
+    const repo = repoMemoria();
+    await gravarConfig(repo, "pausado", false);
+    net.falhas.imagem = 99;
+    await rodada(repo, "teste");
+    const [longe, perto] = repo.linhas;
+    for (let i = 0; i < 3; i++) {
+      await avancaEtapa(repo, { id: longe.id });
+      await avancaEtapa(repo, { id: perto.id });
+    }
+    const agora = Date.now();
+    // Um horário daqui a 2 dias e outro que, 3 h depois, estará a menos de 1 h.
+    Object.assign(repo.linhas.find((x) => x.id === longe.id)!, { vaga: new Date(agora + 2 * 24 * 3600e3).toISOString() });
+    Object.assign(repo.linhas.find((x) => x.id === perto.id)!, { vaga: new Date(agora + 3.5 * 3600e3).toISOString() });
+    for (const id of [longe.id, perto.id]) assertEquals(repo.linhas.find((x) => x.id === id)!.status, "erro");
+
+    await manutencao(repo, [], agora); // logo depois: continua em erro
+    assertEquals(repo.linhas.find((x) => x.id === longe.id)!.status, "erro");
+
+    await manutencao(repo, [], agora + 3 * 3600e3 + 60e3);
+    const p = repo.linhas.find((x) => x.id === longe.id)!;
+    assertEquals(p.status, "gerando");
+    assertEquals(p.tentativas, 0);
+    assertEquals(repo.linhas.find((x) => x.id === perto.id)!.status, "erro");
   } finally {
     net.restaura();
   }
