@@ -29,6 +29,8 @@ export interface FollowUpContext {
   withImage?: boolean; // a mensagem vai como legenda de uma arte do buffet
   corporate?: string | null; // confraternização de empresa ("" = empresa sem nome)
   atStart?: boolean; // conversa parou na apresentação: cliente ainda não disse o nome nem nada da festa
+  visitOffers?: string[]; // horários de visita livres de verdade ("quinta (29/10) às 15h")
+  visitHours?: string | null; // janelas de visita cadastradas
 }
 
 const MATERIAL_NAME: Record<MaterialKind, string> = { fotos: "as fotos do espaço", video: "o vídeo", pacotes: "o PDF dos pacotes" };
@@ -81,6 +83,9 @@ export function followUpInstruction(c: FollowUpContext): string {
     who ? `Dados do cliente: ${who}.` : "",
     agenda,
     c.promoLine ? ` ${c.promoLine}` : "",
+    c.atStart ? "" : c.visitOffers && c.visitOffers.length > 0
+      ? ` VISITA — se for convidar, use SÓ estes horários livres da agenda, com dia e hora escritos assim: ${c.visitOffers.join("; ")}. Nunca invente outro horário nem escreva só "à noite"/"de manhã". Janelas de visita do buffet: ${c.visitHours || "as cadastradas"}. Se o cliente disse quando pode (ex.: "só à noite", "trabalho de dia"), ofereça só os que encaixam; se nenhum encaixa, diga com gentileza quais são as janelas de visita e ofereça a opção mais próxima do que ele pediu (ex.: sábado). No convite de visita não repita a data e o horário da festa, e escreva "conhecer o espaço" (nunca "o espaço do [nome da criança]").`
+      : " VISITA: não há horário de visita livre na agenda agora — não ofereça dia nem hora de visita; se convidar, diga que a equipe combina o melhor horário.",
     c.materialsSent.length > 0
       ? ` Materiais já enviados nesta conversa: ${c.materialsSent.map((k) => MATERIAL_NAME[k]).join(", ")}. Não cite os que não estão nesta lista.`
       : " Nenhum material (fotos, vídeo, PDF) foi enviado nesta conversa: não pergunte se ele viu nem diga que mandou.",
@@ -130,9 +135,39 @@ export function repeatsLastQuestion(reminder: string, lastAssistant: string): bo
   });
 }
 
+// Horas no texto ("15h", "19h30", "10:00") em minutos do dia
+const hoursIn = (t: string): number[] =>
+  [...t.matchAll(/(?<![\d/])(\d{1,2})(?:h(\d{2})?|:(\d{2}))(?![\d])(?!\s*(?:de festa|de dura|horas))/gi)]
+    .map((m) => Number(m[1]) * 60 + Number(m[2] || m[3] || 0))
+    .filter((x) => x >= 0 && x < 24 * 60);
+const VISIT_WORDS = /visit|conhecer (o |nosso )?espa[cç]o|te receber|receber voc[eê]s?/i;
+const PERIOD = /(?:^|\s)(?:à|a|de) (?:noite|tarde|manhã)(?=[\s,.!?]|$)/i;
+
+/**
+ * Convite de visita com horário que não está na agenda: hora citada que não é
+ * de visita livre nem da festa, ou visita só "à noite"/"de manhã" sem hora.
+ */
+export function inventedVisitTimes(text: string, visitTimes: string[], partyText: string): string[] {
+  if (!VISIT_WORDS.test(text)) return [];
+  const ok = new Set([...visitTimes.flatMap(hoursIn), ...hoursIn(partyText)]);
+  const bad = hoursIn(text).filter((m) => !ok.has(m)).map((m) => `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, "0") : ""}`);
+  // "visita na quarta à noite": frase de visita com período e sem hora
+  for (const sentence of text.split(/[.!?\n]+/)) {
+    if (VISIT_WORDS.test(sentence) && PERIOD.test(sentence) && hoursIn(sentence).length === 0) { bad.push("sem hora"); break; }
+  }
+  return [...new Set(bad)];
+}
+
 export function checkFollowUpText(
   raw: string,
-  opts: { previousAssistantTexts: string[]; sentMaterials: Set<MaterialKind>; todayYmd: string; allowRepeatQuestion?: boolean },
+  opts: {
+    previousAssistantTexts: string[];
+    sentMaterials: Set<MaterialKind>;
+    todayYmd: string;
+    allowRepeatQuestion?: boolean;
+    visitTimes?: string[]; // horários de visita livres ("15:00"); undefined = não confere
+    partyText?: string; // horários da festa citados no aviso ("noite (19h)")
+  },
 ): FollowUpCheck {
   let text = String(raw || "").trim().replace(/^["“]|["”]$/g, "").trim();
   if (text.length < 8) return { ok: false, text, problem: "texto vazio" };
@@ -148,6 +183,8 @@ export function checkFollowUpText(
   if (unsent.length > 0) return { ok: false, text, problem: `falou de ${unsent.map((k) => MATERIAL_NAME[k]).join(" e ")}, que não foi enviado` };
   if (SCARCITY.test(text)) return { ok: false, text, problem: "escassez inventada (vagas/datas acabando)" };
   const lastAssistant = opts.previousAssistantTexts[opts.previousAssistantTexts.length - 1] || "";
+  const invented = opts.visitTimes ? inventedVisitTimes(text, opts.visitTimes, opts.partyText || "") : [];
+  if (invented.length > 0) return { ok: false, text, problem: `horário de visita fora da agenda (${invented.join(", ")}) — use só os horários de visita livres do aviso, com dia e hora` };
   // Conversa parada na apresentação: pedir o nome de novo é justamente o lembrete
   if (!opts.allowRepeatQuestion && repeatsLastQuestion(text, lastAssistant)) return { ok: false, text, problem: "repetiu a pergunta da sua última mensagem — pergunte outra coisa e traga algo novo" };
   text = airyParagraphs(moneyWithCents(markTodayTomorrow(fixWeekdays(text, opts.todayYmd), opts.todayYmd)));
