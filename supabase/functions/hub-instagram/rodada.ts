@@ -244,6 +244,15 @@ export async function manutencao(repo: Repo, log: Registro[] = [], agora = Date.
   // Envio interrompido no meio (ex.: a função caiu): volta para a fila.
   await repo.atualizaVarios({ status: ["enviando"] }, { status: "aprovado" }, new Date(agora - 5 * 60e3).toISOString());
 
+  // Imagem que desistiu ("erro") ganha nova rodada de tentativas a cada 3 h enquanto o horário
+  // estiver longe: uma falha da OpenAI que passa (ex.: modelo trocado em 26/10/2026) não deixa
+  // o horário vazio para sempre.
+  await repo.atualizaVarios(
+    { status: ["erro"], vagaDesde: new Date(agora + 60 * 60e3).toISOString() },
+    { status: "gerando", tentativas: 0, gerando_desde: null, motivo: "Tentando gerar a imagem de novo." },
+    new Date(agora - 3 * 3600e3).toISOString(),
+  );
+
   // 2. Envio: aprovados (ou aguardando, com a aprovação manual desligada). Pausado: só o de teste.
   await enviaProntos(repo, cfg, log);
 

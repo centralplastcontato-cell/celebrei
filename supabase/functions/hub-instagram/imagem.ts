@@ -119,27 +119,49 @@ export async function renderiza(svg: string): Promise<Uint8Array> {
 
 export type Foto = { b64: string; mime: "image/jpeg" | "image/png" };
 
+// Modelos tentados em ordem. Em 26/10/2026 a OpenAI passou a responder "The model 'gpt-image-1'
+// does not exist" e nenhuma imagem saiu: se um modelo some, a foto vem do próximo da lista.
+// OPENAI_IMAGE_MODEL (segredo do Supabase) entra na frente de todos.
+const MODELOS_IMAGEM = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"];
+let modeloQueFunciona: string | null = null;
+
+/** Erro que significa "este modelo não existe ou esta chave não tem acesso": vale tentar o próximo. */
+const modeloIndisponivel = (status: number, msg: string) =>
+  (status === 400 || status === 403 || status === 404) && /model|does not exist|not found|do not have access/i.test(msg);
+
 export async function geraFoto(prompt: string): Promise<Foto> {
   const chave = Deno.env.get("OPENAI_API_KEY");
   if (!chave) throw new Error("OPENAI_API_KEY não configurada nos segredos do Supabase.");
-  const modelo = Deno.env.get("OPENAI_IMAGE_MODEL") || "gpt-image-1";
-  const r = await fetch(`${Deno.env.get("OPENAI_BASE_URL") || "https://api.openai.com/v1"}/images/generations`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: modelo,
-      prompt,
-      size: "1536x1024", // a foto entra num quadro deitado, com cantos arredondados
-      quality: Deno.env.get("OPENAI_IMAGE_QUALITY") || "medium",
-      n: 1,
-      ...(modelo.startsWith("gpt-image") ? { output_format: "jpeg" } : { response_format: "b64_json" }),
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
-  const dados = (await r.json().catch(() => ({}))) as { data?: { b64_json?: string }[]; error?: { message?: string } };
-  const b64 = dados.data?.[0]?.b64_json;
-  if (!r.ok || !b64) throw new Error(`OpenAI imagem ${r.status}: ${dados.error?.message || "sem imagem na resposta"}`.slice(0, 400));
-  return { b64, mime: b64.startsWith("/9j/") ? "image/jpeg" : "image/png" };
+  const preferido = Deno.env.get("OPENAI_IMAGE_MODEL");
+  const fila = [...new Set([modeloQueFunciona, preferido, ...MODELOS_IMAGEM].filter(Boolean) as string[])];
+  const recusados: string[] = [];
+  for (const modelo of fila) {
+    const r = await fetch(`${Deno.env.get("OPENAI_BASE_URL") || "https://api.openai.com/v1"}/images/generations`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelo,
+        prompt,
+        size: "1536x1024", // a foto entra num quadro deitado, com cantos arredondados
+        quality: Deno.env.get("OPENAI_IMAGE_QUALITY") || "medium",
+        n: 1,
+        ...(modelo.startsWith("gpt-image") ? { output_format: "jpeg" } : { response_format: "b64_json" }),
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    const dados = (await r.json().catch(() => ({}))) as { data?: { b64_json?: string }[]; error?: { message?: string } };
+    const b64 = dados.data?.[0]?.b64_json;
+    if (r.ok && b64) {
+      if (modeloQueFunciona !== modelo) console.log(`Instagram: imagem pelo modelo ${modelo}`);
+      modeloQueFunciona = modelo;
+      return { b64, mime: b64.startsWith("/9j/") ? "image/jpeg" : "image/png" };
+    }
+    const msg = dados.error?.message || "sem imagem na resposta";
+    if (!modeloIndisponivel(r.status, msg)) throw new Error(`OpenAI imagem ${r.status} (${modelo}): ${msg}`.slice(0, 400));
+    if (modeloQueFunciona === modelo) modeloQueFunciona = null;
+    recusados.push(`${modelo}: ${msg}`);
+  }
+  throw new Error(`OpenAI imagem: nenhum modelo disponível (${recusados.join(" | ")})`.slice(0, 600));
 }
 
 // ---------------------------------------------------------------- texto

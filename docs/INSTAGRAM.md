@@ -34,6 +34,8 @@ painel: Hub → Instagram (/hub/instagram): aprovar, editar texto, gerar outro, 
 - **Logo**: o mesmo vetor do site (`CelebreiLogo.tsx`), redesenhado em `marca.ts` (`LOGO_512`).
 - **Aprovação manual** (painel): começa desligada (os posts vão direto ao Postaí). Ligada, cada post espera "Aprovar".
 - **Automação** nasce **pausada**: nada é gerado nem enviado até ligar no painel.
+- **Imagem que falhou 3 vezes** (status "erro", no painel "Não deu para gerar") volta sozinha a tentar a
+  cada 3 h, enquanto o horário estiver a mais de 1 h. Uma falha passageira da OpenAI não deixa o horário vazio.
 - **Post de teste**: botão no painel. Gera 1 foto para daqui ~30 min e manda ao Postaí (só feed, sem Story),
   mesmo com a automação pausada.
 - **Quem acessa**: o painel e a função só aceitam admin da Celebrei (`is_admin`).
@@ -56,7 +58,7 @@ painel: Hub → Instagram (/hub/instagram): aprovar, editar texto, gerar outro, 
 O segredo do cron **não** fica aqui: o próprio SQL da instalação cria um valor aleatório em
 `hub_instagram_config.cron_segredo`, que o job manda no header `x-cron-secret` e a função confere.
 
-Opcionais: `OPENAI_IMAGE_MODEL` (padrão `gpt-image-1`), `OPENAI_IMAGE_QUALITY` (`medium`),
+Opcionais: `OPENAI_IMAGE_MODEL` (se vazio, tenta gpt-image-2, gpt-image-1.5, gpt-image-1 e gpt-image-1-mini, nessa ordem; em 26/10/2026 o gpt-image-1 saiu do ar), `OPENAI_IMAGE_QUALITY` (`medium`),
 `OPENAI_TEXT_MODEL` (`gpt-4o-mini`), `POSTAI_URL`.
 
 ## Instalação (uma vez)
