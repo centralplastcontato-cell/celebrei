@@ -88,3 +88,26 @@ Deno.test("lembrete com a conversa parada na apresentação: pede o nome de novo
   assertEquals(checkFollowUpText(again, last).ok, false);
   assertEquals(checkFollowUpText(again, { ...last, allowRepeatQuestion: true }).ok, true);
 });
+
+Deno.test("visita no follow-up: só horários livres da agenda, sempre com hora", () => {
+  const base = { previousAssistantTexts: [] as string[], sentMaterials: new Set<"fotos" | "video" | "pacotes">(), todayYmd: "2026-10-26" };
+  const visit = { ...base, visitTimes: ["15:00", "10:00", "09:30"], partyText: "almoço (13h) noite (19h)" };
+  // Daiane (Castelo, 26/10): visita "à noite" sem hora e fora das janelas
+  assertEquals(checkFollowUpText("Daiane, tenho visita na quarta à noite ou na quinta à noite 😊 Qual fica melhor?", visit).ok, false);
+  // 19h de visita não existe (só a festa é às 19h)
+  assertEquals(checkFollowUpText("Posso te receber pra conhecer o espaço na quarta às 19h ou quinta às 15h? 😊", { ...visit, partyText: "" }).ok, false);
+  assertEquals(checkFollowUpText("Posso te receber pra conhecer o espaço na quinta (29/10) às 15h ou sábado (31/10) às 9h30? 😊", visit).ok, true);
+  assertEquals(checkFollowUpText("Tenho visita no sábado de manhã, às 10h. Fica bom pra você? 😊", visit).ok, true);
+  // Sem conferir agenda (visitTimes ausente) segue como antes
+  assertEquals(checkFollowUpText("Tenho visita na quarta à noite 😊", base).ok, true);
+  // Instrução leva os horários livres e as janelas
+  const ins = followUpInstruction({ kind: "step", stepNumber: 1, stepsTotal: 3, goal: "Convidar para visita.", silenceMs: 86400000, todayYmd: "2026-10-26", valuesAlreadyGiven: false, materialsSent: [], visitOffers: ["quinta (29/10) às 15h", "sábado (31/10) às 9h"], visitHours: "Segunda a sexta, das 10:00 às 17:00" });
+  assertEquals(ins.includes("quinta (29/10) às 15h; sábado (31/10) às 9h"), true);
+  assertEquals(ins.includes("Segunda a sexta, das 10:00 às 17:00"), true);
+  assertEquals(followUpInstruction({ kind: "step", stepNumber: 1, stepsTotal: 3, goal: "x", silenceMs: 1, todayYmd: "2026-10-26", valuesAlreadyGiven: false, materialsSent: [], visitOffers: [] }).includes("não há horário de visita livre"), true);
+});
+
+Deno.test("duração da festa (4h de festa) não conta como horário de visita", () => {
+  const v = { previousAssistantTexts: [] as string[], sentMaterials: new Set<"fotos" | "video" | "pacotes">(), todayYmd: "2026-10-26", visitTimes: ["15:00"], partyText: "" };
+  assertEquals(checkFollowUpText("São 4h de festa com equipe completa 🎉 Quer conhecer o espaço quinta às 15h?", v).ok, true);
+});

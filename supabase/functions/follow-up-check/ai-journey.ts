@@ -23,6 +23,7 @@ export { type AiTarget, journeyCovers, type JourneyScope, journeyScopes, loadAiJ
 import { mergeConsecutiveTurns } from "../_shared/ai-turn.ts";
 import { resolveUnitNotificationTargets } from "../_shared/notification-targets.ts";
 import { loadBlockedContacts } from "../_shared/contact-block.ts";
+import { freeVisitSlots, friendlyOffers, visitOptions } from "../_shared/visit-offers.ts";
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -445,6 +446,8 @@ export async function runAiJourney(
         // Conversa parou na apresentação: o cliente não disse o nome nem nada da festa
         const atStart = plan.action.kind === "inactivity" && !bd.nome && !partyYmd && !bd.mes && !bd.convidados &&
           !bd.aniversariante && sentMaterials.size === 0;
+        // Visita: só os horários livres de verdade (o texto não pode inventar outro)
+        const visitSlots = atStart ? [] : visitOptions(await freeVisitSlots(supabase, instance.company_id, settings, nowMs, todayYmd));
         const instruction = followUpInstruction({
           kind: plan.action.kind,
           stepNumber: plan.action.kind === "step" ? plan.action.index + 1 : undefined,
@@ -471,6 +474,8 @@ export async function runAiJourney(
           materialsSent: [...sentMaterials],
           withImage: !!imageUrl,
           atStart,
+          visitOffers: friendlyOffers(visitSlots, todayYmd),
+          visitHours: settings.visit_hours || null,
         });
         const system = `Você é a assistente virtual do ${companyName} no WhatsApp, escrevendo uma mensagem de acompanhamento para um cliente que parou de responder. Português do Brasil, tom caloroso e natural, mensagens curtas como no WhatsApp, 1 a 3 emojis. Hoje é ${formatDateLong(todayYmd)} (${todayYmd}). Datas sempre por extenso ("sábado, 26 de dezembro").${settings.extra_instructions ? `\n\nINFORMAÇÕES DO BUFFET (fonte única de fatos; siga o jeito/personalidade descrito aqui):\n${settings.extra_instructions}` : ""}`;
         const session = createLlmSession({ model, system, history: mergeConsecutiveTurns(turns).merged, tools: [], openaiKey, anthropicKey });
@@ -497,7 +502,7 @@ export async function runAiJourney(
             is_test: isTest,
           });
           if (step.refused) break;
-          check = checkFollowUpText(step.text, { previousAssistantTexts: previousAssistant, sentMaterials, todayYmd, allowRepeatQuestion: atStart });
+          check = checkFollowUpText(step.text, { previousAssistantTexts: previousAssistant, sentMaterials, todayYmd, allowRepeatQuestion: atStart, visitTimes: visitSlots.map((v) => v.time), partyText: [...(dateFree || []), alternatives || ""].join(" ") });
           if (check.ok) break;
           console.warn(`[ai-journey] Texto recusado (conv ${conv.id}): ${check.problem}`);
           session.addUserNote(`Sua mensagem NÃO foi enviada: ${check.problem}. Escreva de novo, corrigida, só o texto para o cliente.`);

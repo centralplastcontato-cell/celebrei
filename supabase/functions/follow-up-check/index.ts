@@ -4,7 +4,7 @@ import { findLeadByPhone } from "../_shared/lead-phone.ts";
 import { fetchLastReturns, leadsWithActionSinceReturn } from "../_shared/lead-return.ts";
 import { decideStuckAlert, formatContactList } from "../_shared/stuck-alert.ts";
 import { decideDegradedAlert } from "../_shared/degraded-alert.ts";
-import { businessMinutesBetween, isOpenAt, listAvailableSlots, normalizeTime, parseVisitHours, pickTwoOffers, slotKey, teamHoursText } from "../_shared/business-hours.ts";
+import { businessMinutesBetween, isOpenAt, parseVisitHours, pickTwoOffers, teamHoursText } from "../_shared/business-hours.ts";
 import { teamRepliedAfter } from "../_shared/ai-turn.ts";
 import { keycapsToDigits } from "../_shared/menu-reply.ts";
 import { activeConversations } from "../_shared/followup-activity.ts";
@@ -23,7 +23,7 @@ import { DEFAULT_AI_MODEL, estimateChatCostUsd, providerForModel } from "../_sha
 import { visitStartMs } from "../_shared/visit-confirm.ts";
 import { findPromotion } from "../_shared/promo.ts";
 import { friendlyVisitSlot } from "../_shared/ai-turn.ts";
-import { parseClosedPeriods, isClosedDay } from "../_shared/closed-periods.ts";
+import { freeVisitSlots } from "../_shared/visit-offers.ts";
 import { loadBlockedContacts } from "../_shared/contact-block.ts";
 import { installEvolutionCallGuard } from "../_shared/evolution-guard.ts";
 import { claimSystemSendSlot } from "../_shared/system-send-pacing.ts";
@@ -3021,17 +3021,7 @@ async function processClientDataRequests({
 // 2 horários livres de visita, em texto ("quinta (23/10) às 15h"), pelos
 // horários de visita da IA, tirando os já marcados e o recesso
 async function visitOffers(supabase: SupabaseAdmin, companyId: string, ai: Record<string, any>, nowMs: number, todayYmd: string): Promise<string[]> {
-  const { data: booked } = await supabase.from("lead_visits").select("data_visita, horario_visita")
-    .eq("company_id", companyId).gte("data_visita", todayYmd).in("status_visita", ["agendada", "confirmada", "remarcada"]).limit(1000);
-  const keys = new Set<string>();
-  for (const b of (booked || []) as Array<{ data_visita: string; horario_visita: string | null }>) {
-    const t = normalizeTime(b.horario_visita || "");
-    if (t) keys.add(slotKey({ date: String(b.data_visita).slice(0, 10), time: t }));
-  }
-  const closed = parseClosedPeriods(ai.closed_periods);
-  const free = listAvailableSlots(parseVisitHours(ai.visit_hours), nowMs, keys, { days: 14, minLeadMinutes: 120, max: 60 })
-    .filter((sl) => !isClosedDay(sl.date, closed));
-  return pickTwoOffers(free).map((sl) => friendlyVisitSlot(sl, todayYmd));
+  return pickTwoOffers(await freeVisitSlots(supabase, companyId, ai, nowMs, todayYmd)).map((sl) => friendlyVisitSlot(sl, todayYmd));
 }
 
 // "Vou agendar depois" (Automações → Visitas, Castelo 22/10):
