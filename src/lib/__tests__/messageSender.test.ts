@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { senderDot } from "../messageSender";
+import { senderDot, senderTag } from "../messageSender";
+
+describe("senderTag", () => {
+  it("etiqueta as automações e nada mais", () => {
+    expect(senderTag({ from_me: true, metadata: { source: "scheduled_return" } })).toBe("🔁 Retorno combinado");
+    expect(senderTag({ from_me: true, metadata: { source: "auto_reminder", type: "follow_up_1" } })).toBe("⏰ Lembrete automático");
+    expect(senderTag({ from_me: true, metadata: { source: "visit_confirmation" } })).toBe("✅ Confirmação de visita");
+    expect(senderTag({ from_me: true, metadata: { source: "ai_agent" } })).toBeNull();
+    expect(senderTag({ from_me: true, metadata: { source: "platform" } })).toBeNull();
+    expect(senderTag({ from_me: false, metadata: { source: "scheduled_return" } })).toBeNull();
+    expect(senderTag({ from_me: true, metadata: null })).toBeNull();
+  });
+});
 
 describe("senderDot", () => {
   it("marca equipe, IA e celular; robô e cliente sem bolinha", () => {
