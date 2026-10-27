@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/assert_equals.ts";
-import { askPartyDayAfterMaterials, needsPartyDay, clientAffirms, clientAskedPrice, closingAfterMaterials, friendlyVisitSlot, hasVisitInvite, visitInviteAfterMaterials, confirmsPartyInterest, crossedWithLastReply, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, priceRequestPending, pickLatestIncoming, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, teamRepliedAfter } from "./ai-turn.ts";
+import { askPartyDayAfterMaterials, needsPartyDay, clientAffirms, clientAskedPrice, closingAfterMaterials, friendlyVisitSlot, hasVisitInvite, visitInviteAfterMaterials, confirmsPartyInterest, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, priceRequestPending, pickLatestIncoming, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, teamRepliedAfter } from "./ai-turn.ts";
 
 Deno.test("pickLatestIncoming: a última mensagem do cliente responde por todas", () => {
   assertEquals(pickLatestIncoming([
@@ -284,4 +284,15 @@ Deno.test("pergunta do dia depois do PDF", () => {
   assertEquals(needsPartyDay({ mes: "Dezembro", data_festa: "2026-12-12" }), false);
   assertEquals(needsPartyDay({ mes: "Dezembro", dia_perguntado: "2026-10-22T17:00:00Z" }), false);
   assertEquals(needsPartyDay({}), false);
+});
+
+Deno.test("dayPreferenceFrom: 'na semana' é dia de semana; 'semana que vem' não conta", () => {
+  assertEquals(dayPreferenceFrom("Ok\nNa semana em janeiro\nQuais datas ?"), "dia de semana");
+  assertEquals(dayPreferenceFrom("durante a semana"), "dia de semana");
+  assertEquals(dayPreferenceFrom("pode ser dia útil"), "dia de semana");
+  assertEquals(dayPreferenceFrom("Final de semana"), "fim de semana");
+  assertEquals(dayPreferenceFrom("na semana que vem eu vejo"), null);
+  assertEquals(dayPreferenceFrom("Ou para segunda semana de janeiro"), null);
+  assertEquals(dayPreferenceFrom("dia de semana ou fim de semana?"), null);
+  assertEquals(dayPreferenceFrom("Datas livres para 2026 dezembro"), null);
 });

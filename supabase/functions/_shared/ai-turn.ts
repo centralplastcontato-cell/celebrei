@@ -333,6 +333,19 @@ export function visitInviteAfterMaterials(firstName: string, offers: Array<{ dat
   return options[Math.abs(seed) % options.length];
 }
 
+/**
+ * Preferência de dia que o cliente escreveu: "na semana", "durante a semana",
+ * "dia útil" → dia de semana; "final de semana" → fim de semana. "Semana que
+ * vem" e "segunda semana" não contam (são quando, não o tipo de dia).
+ */
+export function dayPreferenceFrom(text: string): "dia de semana" | "fim de semana" | null {
+  const t = (text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const weekend = /\b(fim|final|fins|finais) de semana\b|\bsabado ou domingo\b/.test(t);
+  const weekday = /\bdias? (de|da) semana\b|\bdias? ute?is\b|\bdia util\b|\b(na|durante a|no meio da) semana\b(?! (que vem|seguinte|passada))/.test(t);
+  if (weekend === weekday) return null;
+  return weekend ? "fim de semana" : "dia de semana";
+}
+
 /** O cliente desistiu / disse que não vai fechar agora */
 export function clientDeclined(text: string): boolean {
   return /(n[aã]o vai dar|n[aã]o d[aá] pra|n[aã]o vou (fechar|conseguir)|desist|fica pra (pr[oó]xima|outra)|sem interesse|n[aã]o tenho interesse|acho que n[aã]o|vou procurar outro|muito caro pra mim)/i.test(text || "");
