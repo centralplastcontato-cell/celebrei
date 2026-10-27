@@ -34,6 +34,7 @@ export const BUFFET_FIELDS: BuffetField[] = [
   { key: "monitores", label: "Monitores acompanhando as crianças", type: "select", options: ["O tempo todo", "Só nos brinquedos", "Não temos"], group: "perguntas" },
   // Degustação: a IA só informa; quem agenda é sempre a equipe (caso Amanda,
   // 14/10 — cliente perguntou de degustação e pediu "hoje", a IA marcou visita)
+  { key: "pagamento", label: "Formas de pagamento", type: "textarea", placeholder: "Pix, cartão ou boleto. A festa precisa estar quitada até 20 dias antes da data.", group: "perguntas", hint: "A IA responde \"aceita boleto?\" sozinha. Desconto, parcelas e negociação continuam com a equipe." },
   { key: "degustacao", label: "Degustação do cardápio", type: "select", options: ["Não oferecemos degustação", "Oferecemos, agendada com a equipe, para quem tem interesse em fechar", "Oferecemos para todos, agendada com a equipe", "Só depois de fechar o contrato"], group: "perguntas", hint: "A IA nunca marca degustação: só informa como funciona, e quem agenda é a equipe." },
   { key: "degustacao_como", label: "Como funciona a degustação", type: "textarea", placeholder: "Agendada com a equipe, às terças à tarde, para até 2 pessoas, depois da visita ao espaço...", group: "perguntas", hint: "Só se vocês oferecem. Deixe em branco se não oferecem." },
   { key: "regras", label: "Regras e o que não fazemos", type: "textarea", placeholder: "Não fazemos festas externas. Visitas somente com agendamento...", group: "regras", hint: "Limites claros evitam que a IA prometa o que vocês não fazem" },
@@ -74,7 +75,7 @@ export function parseBuffetInfo(text: string | null): Record<string, string> {
 }
 
 // Campos que podem ficar em branco sem contar como "falta"
-export const OPTIONAL_BUFFET_FIELDS = new Set(["degustacao_como", "outros"]);
+export const OPTIONAL_BUFFET_FIELDS = new Set(["degustacao_como", "outros", "pagamento"]);
 
 /** Quantos campos importantes já estão preenchidos (Visão geral da IA) */
 export function buffetInfoProgress(extraInstructions: string | null): { filled: number; total: number } {
