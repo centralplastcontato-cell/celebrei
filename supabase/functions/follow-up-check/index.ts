@@ -29,7 +29,7 @@ import { installEvolutionCallGuard } from "../_shared/evolution-guard.ts";
 import { claimSystemSendSlot } from "../_shared/system-send-pacing.ts";
 import { PARTY_SOON_ACTION, partySoon, partySoonLabel } from "../_shared/party-soon.ts";
 import { pacingHeldLeads } from "../_shared/auto-pacing.ts";
-import { type AutoFormType, FORM_AUTO_DEFAULT_DELAY_MIN, FORM_AUTO_DEFAULT_MESSAGES, FORM_AUTO_MAX_LATE_MS, FORM_SENT_ACTION, formAutoDue, formAutoLink, formSentRecord, type FormTemplateRow, partyEndMs, pickCardapioTemplate } from "../_shared/form-auto.ts";
+import { type AutoFormType, FORM_AUTO_DEFAULT_DELAY_MIN, FORM_AUTO_DEFAULT_MESSAGES, FORM_AUTO_MAX_LATE_MS, FORM_SENT_ACTION, formAutoDue, formAutoLink, formAutoPath, formSentRecord, type FormTemplateRow, partyEndMs, partyStartMs, pickCardapioTemplate, prefestaDue } from "../_shared/form-auto.ts";
 import { clientDataLink, clientDataThanks, DEFAULT_CLIENT_DATA_MESSAGE, DEFAULT_CLIENT_DATA_REMINDERS, dueReminder, fillClientDataTemplate, hasCpfInText, isOverdue, normalizeReminderHours, shortClientToken } from "../_shared/client-data.ts";
 
 type SupabaseAdmin = any;
@@ -3373,7 +3373,8 @@ async function processPostVisit({ supabase }: { supabase: SupabaseAdmin }): Prom
   return { sent, errors };
 }
 
-// Formulários automáticos (Automações → Formulários, Castelo 27/10), por buffet:
+// Formulários automáticos (Mensagens automáticas → Formulários, Castelo 27/10), por buffet:
+// - pré-festa: X dias antes da festa;
 // - cardápio: X min depois que o buffet gera o contrato da festa, com o cardápio
 //   do pacote (sem cardápio que case com o pacote não manda: avisa a equipe);
 // - avaliação: X horas depois que a festa termina.
@@ -3384,7 +3385,7 @@ async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): 
   let sent = 0;
   const { data: cfgs, error } = await supabase.from("form_automation_settings")
     .select("company_id, form_type, message_template, auto_delay_minutes, auto_enabled_at")
-    .eq("auto_send", true).eq("is_enabled", true).in("form_type", ["cardapio", "avaliacao"]);
+    .eq("auto_send", true).eq("is_enabled", true).in("form_type", ["prefesta", "cardapio", "avaliacao"]);
   // Colunas novas ainda não criadas no banco: nada a fazer
   if (error) return { sent, errors: /auto_send|auto_delay|auto_enabled/.test(String(error.message)) ? [] : [String(error.message)] };
   if (!cfgs || cfgs.length === 0) return { sent, errors };
@@ -3410,9 +3411,14 @@ async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): 
         const enabledAtMs = cfg.auto_enabled_at ? Date.parse(cfg.auto_enabled_at) : null;
         const sinceIso = new Date(nowMs - delay * 60000 - FORM_AUTO_MAX_LATE_MS[type]).toISOString();
 
-        // Festas candidatas e o momento de referência (contrato gerado / fim da festa)
+        // Festas candidatas e o momento de referência (contrato gerado / fim da festa / início da festa)
         const refByEvent = new Map<string, number>();
-        if (type === "cardapio") {
+        if (type === "prefesta") {
+          const { data: events } = await supabase.from("company_events").select("id, event_date, start_time")
+            .eq("company_id", companyId).eq("status", "confirmado")
+            .gte("event_date", todayYmd).lte("event_date", new Date(nowMs - 3 * 3600000 + (delay / 1440 + 1) * 86400000).toISOString().slice(0, 10)).limit(300);
+          for (const e of (events || []) as any[]) refByEvent.set(e.id, partyStartMs(e.event_date, e.start_time));
+        } else if (type === "cardapio") {
           const { data: contracts } = await supabase.from("generated_contracts").select("event_id, created_at, status")
             .eq("company_id", companyId).not("event_id", "is", null).neq("status", "cancelado").gte("created_at", sinceIso)
             .order("created_at", { ascending: true }).limit(200);
@@ -3423,10 +3429,10 @@ async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): 
             .gte("event_date", new Date(nowMs - 3 * 3600000 - 6 * 86400000).toISOString().slice(0, 10)).lte("event_date", todayYmd).limit(300);
           for (const e of (events || []) as any[]) refByEvent.set(e.id, partyEndMs(e.event_date, e.start_time, e.end_time));
         }
-        const dueIds = [...refByEvent].filter(([, ref]) => formAutoDue(type, ref, delay, enabledAtMs, nowMs)).map(([id]) => id);
+        const dueIds = [...refByEvent].filter(([, ref]) => type === "prefesta" ? prefestaDue(ref, delay, enabledAtMs, nowMs) : formAutoDue(type, ref, delay, enabledAtMs, nowMs)).map(([id]) => id);
         if (dueIds.length === 0) continue;
 
-        const { data: templates } = await supabase.from(type === "cardapio" ? "cardapio_templates" : "evaluation_templates")
+        const { data: templates } = await supabase.from(type === "cardapio" ? "cardapio_templates" : type === "prefesta" ? "prefesta_templates" : "evaluation_templates")
           .select("id, name, slug").eq("company_id", companyId).eq("is_active", true).order("created_at", { ascending: true });
         const tpls = (templates || []) as FormTemplateRow[];
 
@@ -3440,7 +3446,7 @@ async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): 
           const { data: prior } = await supabase.from("lead_history").select("id").eq("lead_id", ev.lead_id)
             .in("action", [FORM_SENT_ACTION, "form_auto_skipped"]).like("new_value", `%"event_id":"${eventId}"%`).like("new_value", `%"form_type":"${type}"%`).limit(1);
           if ((prior || []).length > 0) continue;
-          const { data: answered } = await supabase.from(type === "cardapio" ? "cardapio_responses" : "evaluation_responses").select("id").eq("event_id", eventId).limit(1);
+          const { data: answered } = await supabase.from(type === "cardapio" ? "cardapio_responses" : type === "prefesta" ? "prefesta_responses" : "evaluation_responses").select("id").eq("event_id", eventId).limit(1);
           if ((answered || []).length > 0) continue;
 
           const { data: lead } = await supabase.from("campaign_leads").select("name, unit").eq("id", ev.lead_id).maybeSingle();
@@ -3473,7 +3479,7 @@ async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): 
           if (!conv || isBlocked(companyId, conv.remote_jid)) continue;
           // Link desse formulário já mandado na conversa (envio manual de antes deste registro)
           const { data: linkSent } = await supabase.from("wapi_messages").select("id").eq("conversation_id", conv.id).eq("from_me", true)
-            .like("content", `%/${type === "cardapio" ? "cardapio" : "avaliacao"}/%`).gte("timestamp", new Date(nowMs - 120 * 86400000).toISOString()).limit(1);
+            .like("content", `%/${formAutoPath(type)}/%`).gte("timestamp", new Date(nowMs - 120 * 86400000).toISOString()).limit(1);
           if ((linkSent || []).length > 0) continue;
 
           const { data: inst } = await supabase.from("wapi_instances")

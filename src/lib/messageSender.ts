@@ -37,6 +37,10 @@ export function senderTag(msg: { from_me: boolean; metadata?: unknown }): string
   if (!msg.from_me) return null;
   const meta = metaOf(msg);
   const source = meta?.source;
-  if (source === "form_auto") return meta?.form_type === "avaliacao" ? "⭐ Avaliação automática" : "🍽️ Cardápio automático";
+  if (source === "form_auto") {
+    if (meta?.form_type === "avaliacao") return "⭐ Avaliação automática";
+    if (meta?.form_type === "prefesta") return "🎉 Pré-festa automático";
+    return "🍽️ Cardápio automático";
+  }
   return typeof source === "string" ? AUTOMATION_TAGS[source] ?? null : null;
 }
