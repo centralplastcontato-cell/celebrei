@@ -64,7 +64,7 @@ export const QUESTIONNAIRE: QuestionSection[] = [
     id: "rapidas",
     title: "Perguntas que todo cliente faz",
     description: "Escolha a resposta certa para o seu buffet.",
-    questions: BUFFET_FIELDS.filter((f) => f.group === "perguntas").map((f) => fromField(f.key, f.key === "degustacao_como" ? { optional: true } : {})),
+    questions: BUFFET_FIELDS.filter((f) => f.group === "perguntas" && f.key !== "pagamento").map((f) => fromField(f.key, f.key === "degustacao_como" ? { optional: true } : {})),
   },
   {
     id: "regras",
@@ -90,7 +90,8 @@ export const QUESTIONNAIRE: QuestionSection[] = [
     description: "Os valores vêm sempre da tabela cadastrada — aqui você diz quando e como falar deles.",
     questions: [
       { key: "quando_preco", label: "Quando a IA pode passar valores?", type: "select", options: ["Só quando o cliente pergunta o preço", "Sempre, junto com os materiais", "Nunca — só manda o PDF de pacotes", "Nunca — preço é sempre com a equipe"] },
-      { key: "pagamento", label: "Formas de pagamento que a IA pode informar", type: "textarea", placeholder: "Ex.: entrada de 30% e o restante em até 10x no cartão. Ou: \"deixar sempre para a equipe\"", hint: "Desconto e negociação ficam sempre com a equipe." },
+      // Mesmo campo de "Sobre o buffet → Respostas rápidas" (a IA responde dele)
+      fromField("pagamento", { label: "Formas de pagamento que a IA pode informar", hint: "Desconto, parcelas e negociação ficam sempre com a equipe." }),
       { key: "promessas", label: "O que a IA NUNCA pode prometer", type: "textarea", placeholder: "Ex.: data garantida sem contrato, brinde, desconto, item fora do pacote..." },
       { key: "promocoes", label: "Promoções vigentes (com validade)", type: "textarea", placeholder: "Ex.: fechando até 31/10, 10 convidados grátis para festas em 2026", optional: true },
     ],
