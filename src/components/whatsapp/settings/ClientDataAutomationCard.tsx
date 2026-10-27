@@ -24,6 +24,8 @@ interface Settings {
   reminders_enabled: boolean;
   reminder_hours: number[];
   reminder_messages: string[];
+  // Foto do documento no formulário: não pedir / opcional / obrigatório (null = banco sem a coluna)
+  document_upload: "off" | "optional" | "required" | null;
 }
 
 /**
@@ -46,6 +48,8 @@ export function ClientDataAutomationCard() {
         .eq("form_type", "contrato")
         .maybeSingle();
       if (error) { setAvailable(false); return; } // banco sem as colunas (SQL não rodado)
+      const { data: docRow, error: docErr } = await (supabase as any).from("form_automation_settings").select("document_upload")
+        .eq("company_id", currentCompanyId).eq("form_type", "contrato").maybeSingle();
       const hours = Array.isArray(data?.reminder_hours) && data.reminder_hours.length === 3 ? data.reminder_hours : [24, 48, 72];
       const msgs = Array.isArray(data?.reminder_messages) ? data.reminder_messages : [];
       setSettings({
@@ -53,6 +57,7 @@ export function ClientDataAutomationCard() {
         reminders_enabled: data?.reminders_enabled === true,
         reminder_hours: hours,
         reminder_messages: DEFAULT_CLIENT_DATA_REMINDERS.map((d, i) => (msgs[i] || "").trim() || d),
+        document_upload: docErr ? null : (["optional", "required"].includes(docRow?.document_upload) ? docRow.document_upload : "off"),
       });
     })();
   }, [currentCompanyId]);
@@ -62,7 +67,7 @@ export function ClientDataAutomationCard() {
   const save = async () => {
     if (!currentCompanyId) return;
     setSaving(true);
-    const payload = {
+    const payload: Record<string, unknown> = {
       auto_on_closed: settings.auto_on_closed,
       reminders_enabled: settings.reminders_enabled,
       reminder_hours: settings.reminder_hours,
@@ -70,6 +75,7 @@ export function ClientDataAutomationCard() {
       reminder_messages: settings.reminder_messages.map((m, i) => (m.trim() === DEFAULT_CLIENT_DATA_REMINDERS[i] ? "" : m.trim())),
       updated_at: new Date().toISOString(),
     };
+    if (settings.document_upload) payload.document_upload = settings.document_upload;
     const { data: existing } = await supabase.from("form_automation_settings").select("id")
       .eq("company_id", currentCompanyId).eq("form_type", "contrato").maybeSingle();
     const { error } = existing
@@ -130,6 +136,23 @@ export function ClientDataAutomationCard() {
             </p>
           )}
         </div>
+
+        {settings.document_upload && (
+          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Label className="text-sm font-medium">Foto do documento (RG ou CNH)</Label>
+              <p className="text-xs text-muted-foreground">O cliente manda a foto no próprio formulário. Fica guardada só para a equipe ("Ver dados" na conversa).</p>
+            </div>
+            <Select value={settings.document_upload} onValueChange={(v) => setSettings({ ...settings, document_upload: v as Settings["document_upload"] })}>
+              <SelectTrigger className="h-9 w-full sm:w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="off">Não pedir</SelectItem>
+                <SelectItem value="optional">Pedir (opcional)</SelectItem>
+                <SelectItem value="required">Obrigatório</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex justify-end">
           <Button size="sm" onClick={save} disabled={saving}>

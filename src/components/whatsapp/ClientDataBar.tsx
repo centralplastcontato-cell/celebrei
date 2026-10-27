@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Copy, Loader2, Send } from "lucide-react";
 import {
@@ -155,6 +156,29 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Documento com foto que o cliente mandou (bucket privado: link de 5 min) */
+function DocumentField({ path, name }: { path: string; name?: string }) {
+  const [opening, setOpening] = useState(false);
+  const open = async () => {
+    setOpening(true);
+    const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(path, 300);
+    setOpening(false);
+    if (error || !data?.signedUrl) {
+      toast({ title: "Não consegui abrir o documento", description: error?.message, variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
+  };
+  return (
+    <button type="button" onClick={open} disabled={opening} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-left hover:bg-muted/60">
+      <span className="shrink-0 text-xs text-muted-foreground">Documento</span>
+      <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary">
+        <span className="truncate">{opening ? "Abrindo…" : `📎 Ver ${name ? `(${name})` : "documento"}`}</span>
+      </span>
+    </button>
+  );
+}
+
 function Section({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-border/50 bg-muted/30 p-3">
@@ -202,6 +226,7 @@ function ClientDataDialog({ open, onOpenChange, data }: { open: boolean; onOpenC
               <Field label="RG" value={String(d.rg || "")} />
               <Field label="Nascimento" value={brDate(d.nascimento)} />
               <Field label="E-mail" value={String(d.email || "")} />
+              {d.documento_arquivo && <DocumentField path={String(d.documento_arquivo)} name={d.documento_nome ? String(d.documento_nome) : undefined} />}
             </Section>
             <div className="space-y-3">
               {(d.pacote || d.convidados) && (
