@@ -6,6 +6,8 @@ describe("senderTag", () => {
     expect(senderTag({ from_me: true, metadata: { source: "scheduled_return" } })).toBe("🔁 Retorno combinado");
     expect(senderTag({ from_me: true, metadata: { source: "auto_reminder", type: "follow_up_1" } })).toBe("⏰ Lembrete automático");
     expect(senderTag({ from_me: true, metadata: { source: "visit_confirmation" } })).toBe("✅ Confirmação de visita");
+    expect(senderTag({ from_me: true, metadata: { source: "form_auto", form_type: "cardapio" } })).toBe("🍽️ Cardápio automático");
+    expect(senderTag({ from_me: true, metadata: { source: "form_auto", form_type: "avaliacao" } })).toBe("⭐ Avaliação automática");
     expect(senderTag({ from_me: true, metadata: { source: "ai_agent" } })).toBeNull();
     expect(senderTag({ from_me: true, metadata: { source: "platform" } })).toBeNull();
     expect(senderTag({ from_me: false, metadata: { source: "scheduled_return" } })).toBeNull();

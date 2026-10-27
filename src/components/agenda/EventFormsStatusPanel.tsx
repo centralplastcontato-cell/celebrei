@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { pickCardapioTemplate } from "@/lib/cardapioMatch";
+import { loadFormsSent, recordFormSent } from "@/lib/formSentHistory";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -497,17 +499,13 @@ export function EventFormsStatusPanel({ eventId, companyId, leadId, eventDate, p
     setLoading(true);
 
     try {
-      const { data: historyData } = await supabase
-        .from("lead_history")
-        .select("details")
-        .eq("action", "form_sent_whatsapp")
-        .contains("details", JSON.stringify({ event_id: eventId }));
+      const sentTypes = new Set<string>((await loadFormsSent(eventId)).map((r) => r.form_type));
 
-      const sentTypes = new Set<string>();
-      (historyData || []).forEach((row: any) => {
-        const d = typeof row.details === "string" ? JSON.parse(row.details) : row.details;
-        if (d?.form_type) sentTypes.add(d.form_type);
-      });
+      // Cardápio: o do pacote da festa (antes ia sempre o primeiro cadastrado)
+      const [{ data: eventRow }, { data: brandRow }] = await Promise.all([
+        supabase.from("company_events").select("package_name").eq("id", eventId).maybeSingle(),
+        supabase.from("companies").select("name").eq("id", companyId).maybeSingle(),
+      ]);
 
       // Fetch first active template for each form type to enable sending
       // Note: cardapio_templates uses "sections" instead of "questions"
@@ -520,7 +518,10 @@ export function EventFormsStatusPanel({ eventId, companyId, leadId, eventDate, p
           .select(selectFields)
           .eq("company_id", companyId)
           .eq("is_active", true)
-          .limit(1);
+          .order("created_at", { ascending: true });
+        if (ft.type === "cardapio") {
+          return { type: ft.type, template: pickCardapioTemplate((data || []) as any[], eventRow?.package_name, brandRow?.name) };
+        }
         return { type: ft.type, template: data?.[0] || null };
       });
       const templateResults = await Promise.all(templatePromises);
@@ -708,12 +709,7 @@ export function EventFormsStatusPanel({ eventId, companyId, leadId, eventDate, p
       }
 
       // Log the send
-      await supabase.from("lead_history").insert({
-        lead_id: leadId,
-        company_id: companyId,
-        action: "form_sent_whatsapp",
-        details: { form_type: fs.type, template_id: fs.templateId, event_id: eventId },
-      });
+      await recordFormSent(leadId, companyId, { form_type: fs.type, template_id: fs.templateId, event_id: eventId });
 
       toast({ title: `${fs.label} enviado via WhatsApp ✅` });
       fetchStatuses(); // Refresh to show updated status

@@ -21,7 +21,17 @@ interface FormConfig {
   send_hour: number;
   send_minute: number;
   message_template: string;
+  // Envio automático de verdade (cardápio e avaliação) — colunas novas
+  auto_send?: boolean;
+  auto_delay_minutes?: number | null;
+  auto_enabled_at?: string | null;
 }
+
+// Cardápio: minutos depois de gerar o contrato; avaliação: horas depois da festa
+const AUTO_TYPES = new Set(["cardapio", "avaliacao"]);
+const AUTO_DEFAULT_DELAY: Record<string, number> = { cardapio: 20, avaliacao: 1440 };
+const CARDAPIO_DELAYS = [10, 20, 30, 60, 120];
+const AVALIACAO_DELAY_HOURS = [2, 6, 12, 24, 48, 72];
 
 const FORM_TYPES = [
   {
@@ -117,6 +127,8 @@ export function FormAutomationSection() {
   const [configs, setConfigs] = useState<FormConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [savingType, setSavingType] = useState<string | null>(null);
+  // As colunas do envio automático existem no banco? (antes da migração, não)
+  const [hasAuto, setHasAuto] = useState(false);
 
   useEffect(() => {
     if (currentCompanyId) fetchConfigs();
@@ -137,6 +149,13 @@ export function FormAutomationSection() {
       return;
     }
 
+    let autoColumns = (data || []).some((d: any) => "auto_send" in d);
+    if (!autoColumns && (data || []).length === 0) {
+      const probe = await supabase.from("form_automation_settings").select("auto_send" as any).limit(1);
+      autoColumns = !probe.error;
+    }
+    setHasAuto(autoColumns);
+
     const merged = FORM_TYPES.map((ft) => {
       const existing = data?.find((d: any) => d.form_type === ft.type);
       if (existing) {
@@ -148,6 +167,9 @@ export function FormAutomationSection() {
           send_hour: existing.send_hour,
           send_minute: existing.send_minute,
           message_template: getMessageTemplate(existing.form_type, existing.message_template),
+          auto_send: (existing as any).auto_send === true,
+          auto_delay_minutes: (existing as any).auto_delay_minutes ?? null,
+          auto_enabled_at: (existing as any).auto_enabled_at ?? null,
         };
       }
       return {
@@ -174,7 +196,7 @@ export function FormAutomationSection() {
     if (!currentCompanyId) return;
     setSavingType(config.form_type);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       company_id: currentCompanyId,
       form_type: config.form_type,
       is_enabled: config.is_enabled,
@@ -183,17 +205,23 @@ export function FormAutomationSection() {
       send_minute: config.send_minute,
       message_template: config.message_template,
     };
+    if (hasAuto && AUTO_TYPES.has(config.form_type)) {
+      payload.auto_send = !!config.auto_send;
+      payload.auto_delay_minutes = config.auto_delay_minutes ?? AUTO_DEFAULT_DELAY[config.form_type];
+      // Ao ligar, marca a hora: contratos e festas de antes não recebem envio
+      payload.auto_enabled_at = config.auto_send ? (config.auto_enabled_at || new Date().toISOString()) : null;
+    }
 
     let error;
     if (config.id) {
       ({ error } = await supabase
         .from("form_automation_settings")
-        .update(payload)
+        .update(payload as any)
         .eq("id", config.id));
     } else {
       const { data, error: insertError } = await supabase
         .from("form_automation_settings")
-        .insert(payload)
+        .insert(payload as any)
         .select()
         .single();
       error = insertError;
@@ -277,7 +305,54 @@ export function FormAutomationSection() {
 
               {config.is_enabled && (
                 <CardContent className="space-y-4 pt-0">
-                  {/* Auto/Manual toggle + scheduling for ALL types */}
+                  {hasAuto && AUTO_TYPES.has(config.form_type) ? (
+                    <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label className="text-sm font-medium">Enviar automaticamente</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {config.form_type === "cardapio"
+                              ? "Manda o cardápio sozinho depois que o contrato da festa é gerado"
+                              : "Manda a avaliação sozinha depois que a festa termina"}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={!!config.auto_send}
+                          onCheckedChange={(checked) => updateConfig(config.form_type, "auto_send", checked)}
+                        />
+                      </div>
+                      {config.auto_send && (
+                        <>
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span>Enviar</span>
+                            <Select
+                              value={String(config.auto_delay_minutes ?? AUTO_DEFAULT_DELAY[config.form_type])}
+                              onValueChange={(v) => updateConfig(config.form_type, "auto_delay_minutes", parseInt(v))}
+                            >
+                              <SelectTrigger className="h-9 w-[130px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {config.form_type === "cardapio"
+                                  ? CARDAPIO_DELAYS.map((m) => (
+                                      <SelectItem key={m} value={String(m)}>{m < 60 ? `${m} minutos` : `${m / 60} ${m === 60 ? "hora" : "horas"}`}</SelectItem>
+                                    ))
+                                  : AVALIACAO_DELAY_HOURS.map((h) => (
+                                      <SelectItem key={h} value={String(h * 60)}>{h} horas</SelectItem>
+                                    ))}
+                              </SelectContent>
+                            </Select>
+                            <span>{config.form_type === "cardapio" ? "depois de gerar o contrato" : "depois do fim da festa"}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            🕘 Só sai no horário de atendimento da equipe (nunca depois das 20h); se cair fora, sai no próximo horário.
+                            {config.form_type === "cardapio"
+                              ? " Vai o cardápio do pacote da festa — se o pacote não tiver cardápio, a equipe é avisada e nada é enviado."
+                              : ""}
+                            {" "}Uma vez por festa, e não manda se o cliente já respondeu ou se o link já foi enviado.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  ) : (
                   <div className="rounded-lg bg-muted/50 p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -359,6 +434,7 @@ export function FormAutomationSection() {
                       </p>
                     )}
                   </div>
+                  )}
 
 
                   {/* Message Template */}
