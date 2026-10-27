@@ -3,11 +3,11 @@
 // "INFORMAÇÕES DO BUFFET" que a IA lê (src/lib/aiBuffetFields.ts).
 
 import { useEffect, useMemo, useState } from "react";
+import { SelectOrCustom } from "./SelectOrCustom";
 import { Check, ListChecks, Loader2, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { BUFFET_FIELDS, OPTIONAL_BUFFET_FIELDS, parseBuffetInfo, serializeBuffetInfo } from "@/lib/aiBuffetFields";
 import { AiCard, SaveBar } from "./AiFormBits";
@@ -78,14 +78,8 @@ export function AiBuffetInfoSection() {
                   <Label className="text-xs font-bold" htmlFor={`ai-f-${f.key}`}>{f.label}</Label>
                   {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
                   {f.type === "select" ? (
-                    <Select value={values[f.key] || ""} onValueChange={(v) => setField(f.key, v)}>
-                      <SelectTrigger id={`ai-f-${f.key}`} className="h-auto min-h-10 py-2 text-left bg-card border-border shadow-sm">
-                        <SelectValue placeholder="Selecione uma opção" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(f.options || []).map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SelectOrCustom id={`ai-f-${f.key}`} value={values[f.key] || ""} options={f.options || []} onChange={(v) => setField(f.key, v)}
+                      triggerClassName="h-auto min-h-10 py-2 text-left bg-card border-border shadow-sm" />
                   ) : f.type === "textarea" ? (
                     <Textarea id={`ai-f-${f.key}`} value={values[f.key] || ""} onChange={(e) => setField(f.key, e.target.value)} rows={4}
                       className="text-base sm:text-sm resize-none" placeholder={`Ex.: ${f.placeholder}`} />

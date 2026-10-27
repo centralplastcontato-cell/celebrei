@@ -41,7 +41,7 @@ describe("questionário da IA", () => {
 
   it("puxa os fatos já cadastrados na IA", () => {
     const pre = prefillFromSettings({
-      extra_instructions: "Texto antigo solto\nEndereço: Av. General Osório, 1442\nEstacionamento: Vaga própria grátis\nBebida alcoólica: opção que não existe",
+      extra_instructions: "Texto antigo solto\nEndereço: Av. General Osório, 1442\nEstacionamento: Vaga própria grátis\nBebida alcoólica: Pode trazer cerveja, sem destilados",
       assistant_name: "Ana Castelo",
       visit_hours: "Segunda a sexta, das 10:00 às 17:00",
       team_hours: null,
@@ -49,7 +49,8 @@ describe("questionário da IA", () => {
     expect(pre.assistente).toBe("Ana Castelo");
     expect(pre.endereco).toBe("Av. General Osório, 1442");
     expect(pre.estacionamento).toBe("Vaga própria grátis");
-    expect(pre.bebida_alcoolica).toBeUndefined();
+    // "Outra resposta" escrita pelo buffet fica (Rodrigo, Mega Magic 27/10)
+    expect(pre.bebida_alcoolica).toBe("Pode trazer cerveja, sem destilados");
     expect(pre.horarios_visita).toBe("Segunda a sexta, das 10:00 às 17:00");
     expect(pre.outros).toBe("Texto antigo solto");
     expect(prefillFromSettings(null)).toEqual({});

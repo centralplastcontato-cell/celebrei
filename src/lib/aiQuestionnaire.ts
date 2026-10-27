@@ -19,6 +19,8 @@ export interface Question {
   hint?: string;
   /** Pode ficar em branco sem travar o envio */
   optional?: boolean;
+  /** Escolha com "✏️ Outra resposta" escrita */
+  allowCustom?: boolean;
 }
 
 export interface QuestionSection {
@@ -39,6 +41,8 @@ const fromField = (key: string, extra: Partial<Question> = {}): Question => {
     options: f.options,
     placeholder: f.placeholder ? `Ex.: ${f.placeholder}` : undefined,
     hint: f.hint,
+    // Perguntas do buffet aceitam "Outra resposta" escrita (vai igual para a IA)
+    allowCustom: f.type === "select" ? true : undefined,
     ...extra,
   };
 };
@@ -170,7 +174,7 @@ export function cleanAnswers(answers: QuestionnaireAnswers): QuestionnaireAnswer
       const list = Array.isArray(v) ? v.filter((o) => q.options?.includes(o)) : [];
       if (list.length) out[q.key] = list;
     } else if (typeof v === "string" && v.trim()) {
-      out[q.key] = q.type === "select" && !q.options?.includes(v) ? "" : v.trim();
+      out[q.key] = q.type === "select" && !q.options?.includes(v) && !q.allowCustom ? "" : v.trim();
       if (!out[q.key]) delete out[q.key];
     }
   }
