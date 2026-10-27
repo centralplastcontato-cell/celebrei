@@ -43,7 +43,7 @@ import { campaignPromptNote, loadCampaignContext } from "../_shared/campaign-con
 import { closedPeriodAt, closedPeriodsNote, formatClosedPeriod, isClosedDay, parseClosedPeriods } from "../_shared/closed-periods.ts";
 import { dayWithArticle, nearestAlternativeDays, partyDateFreeNote, partyDateTakenMessage } from "../_shared/party-date-check.ts";
 import { birthdayFlavored, corporateCaptions, corporateLeadNote, corporatePromptBlock, mentionsCorporate } from "../_shared/corporate-event.ts";
-import { AI_INBOUND_LAG_MS, asksPartnership, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
+import { AI_INBOUND_LAG_MS, asksPartnership, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
 import { firstNameOrEmpty, sendQualificationMaterials } from "./qualification-materials.ts";
 import { askedForName, nameFromAnswer } from "../_shared/name-answer.ts";
 import { falseMaterialClaims, hasMaterialClaim, hasSubstance, refersToMaterial, stripFalseMaterialClaims } from "../_shared/material-claims.ts";
@@ -643,10 +643,11 @@ QUEM É O CONTATO (nem todo mundo quer orçamento):
 - Depois da lista de "como posso te ajudar", se a pessoa responder com um tipo de festa ("aniversário", "festa", "festa infantil", "15 anos", "orçamento"), ISSO JÁ É ORÇAMENTO: não pergunte de novo se é orçamento ou festa marcada — comemore e siga direto para o próximo passo (mês/data e número de convidados). Só trate como festa marcada se ela disser que já tem festa/contrato com a gente.
 - Se não estiver claro o que a pessoa quer, pergunte com gentileza qual é a dúvida — e, se ela disser que "tem uma festa" sem deixar claro, se a festa já está marcada com a gente ou se ela está procurando orçamento — ANTES de falar de pacotes, mês ou convidados.
 - Pediu para NÃO RECEBER MAIS MENSAGENS ("sair da lista", "não quero mais receber", "para de me mandar"): responda UMA mensagem curta e gentil, chamando pelo nome se souber, dizendo que entendeu e que a equipe já foi avisada para tirar o número da lista (ex.: "Tudo bem, [nome]! Já avisei a equipe para não te mandarmos mais mensagens 😊 Se um dia precisar, é só chamar."). Não ofereça nada, não convide para visita, não faça pergunta e não chame ferramentas.
-- Já tem festa marcada/contrato com a gente: NÃO trate como orçamento (nada de pacotes, valores, promoção ou visita). Dúvidas gerais do buffet (endereço, regras, o que tem no espaço) você responde; sobre a festa contratada (horários, cardápio escolhido, convidados, pagamentos, mudanças) use transferir_para_atendente com assunto cliente_com_festa.
+- Já tem festa marcada/contrato com a gente (festa que ainda vai acontecer): NÃO trate como orçamento (nada de pacotes, valores, promoção ou visita). Dúvidas gerais do buffet (endereço, regras, o que tem no espaço) você responde; sobre a festa contratada (horários, cardápio escolhido, convidados, pagamentos, mudanças) use transferir_para_atendente com assunto cliente_com_festa.
 - Quer trabalhar / enviar currículo: use transferir_para_atendente com assunto trabalhar (e, em funcoes, as funções que a pessoa citou). Não precisa perguntar a função antes.
 - Fornecedor, quer vender algo ou oferecer um serviço (fora permuta/parceria de divulgação, que tem regra própria): use transferir_para_atendente com assunto fornecedor.
-- Quer orçamento de festa: siga normalmente.
+- Quer orçamento de festa: siga normalmente. Quem já fez festa com a gente antes ("fizemos ano passado") e quer outra é orçamento normal — não passe para a equipe por isso.
+- Perguntou da promoção: responda com as regras das INFORMAÇÕES DO BUFFET e siga a conversa — perguntar da promoção NÃO é motivo para passar para a equipe (Joyce, Castelo 26/10). Só passe se ele pedir desconto, parcelamento ou outra condição além da promoção, como na regra abaixo.
 - Quebre objeções com empatia ("vou pensar" → ofereça a visita sem compromisso; "tá caro" → valorize o que está incluso).
 - Se o cliente disser que não vai fechar / desistiu / não dá agora: aceite com gentileza, agradeça e deixe a porta aberta ("se mudar de ideia, é só me chamar") — NÃO insista, NÃO ofereça visita nem horários.
 - Permuta, parceria, patrocínio ou divulgação em troca da festa (influenciador): NÃO aceite, NÃO recuse e NÃO fale em desconto — diga com simpatia que vai passar a proposta para a equipe avaliar e use transferir_para_atendente (motivo: proposta de permuta/parceria).
@@ -700,7 +701,8 @@ ${settings.corporate_events_enabled ? `${corporatePromptBlock(companyName, setti
 OUTROS TIPOS DE EVENTO: você atende festas de aniversário e confraternizações de empresas. Se o cliente quiser formatura, festa escolar ou outro evento que não seja nenhum dos dois, NÃO passe valor nem compare pacotes: pergunte (o que ainda não souber) o tipo de evento, a data e a quantidade de pessoas, e então use transferir_para_atendente com o motivo no formato "Evento: … | Data: … | Pessoas: …".` : `OUTROS TIPOS DE EVENTO: você atende festas de aniversário. Se o cliente quiser formatura, festa escolar, confraternização, evento corporativo ou outro evento que não seja aniversário, NÃO passe valor nem compare pacotes: pergunte (o que ainda não souber) o tipo de evento, a data e a quantidade de pessoas, e então use transferir_para_atendente com o motivo no formato "Evento: … | Data: … | Pessoas: …".`}
 
 DATAS DA FESTA (agenda):
-- Antes de listar datas, se o cliente ainda não disse, pergunte se ele prefere fim de semana ou dia de semana (e passe a preferência para a ferramenta).
+- Antes de listar datas, se o cliente ainda não disse, pergunte se ele prefere fim de semana ou dia de semana (e passe a preferência para a ferramenta). Se ele já disse — "na semana", "durante a semana", "dia útil" = dia de semana; "final de semana", "sábado ou domingo" = fim de semana — NÃO pergunte de novo: consulte com essa preferência e mostre as datas.
+- Nunca faça a mesma pergunta duas vezes na mesma resposta (nem com outras palavras).
 - Datas futuras (inclusive no ano que vem): consulte a agenda normalmente (consultar_datas_livres com o mês e o ano) e mostre o que está disponível — NUNCA diga que "ainda não dá para reservar" ou que a agenda não abriu. A reserva é feita com contrato e sinal pela equipe.
 - Quando o cliente perguntar por data livre, ou disser o mês/data da festa, use consultar_datas_livres (com o dia da semana ou a preferência dele).
 - Lista de datas: use as linhas prontas da ferramenta (🗓️ dia, ☀️ almoço, 🌙 noite, horários embaixo de cada data, sem negrito) e termine com uma pergunta; o aviso de contrato e sinal vai curto, entre parênteses, no final. Exemplo:
@@ -2633,7 +2635,10 @@ export async function maybeHandleWithAiAgent(
           } else if (call.name === 'enviar_materiais') {
             toolResult = await toolEnviarMateriais(supabase, instance, conv, phone, contactName, String(args.tipo || ''), args.reenviar === true);
           } else if (call.name === 'consultar_datas_livres') {
-            toolResult = await toolConsultarDatas(supabase, instance, settings, args, conv);
+            // Joyce (26/10): disse "na semana em janeiro" e a IA consultou sem a
+            // preferência, então perguntou de novo em vez de mostrar as datas
+            const inferred = !args.preferencia && !args.dia_semana ? dayPreferenceFrom(lastUserText) : null;
+            toolResult = await toolConsultarDatas(supabase, instance, settings, inferred ? { ...args, preferencia: inferred } : args, conv);
           } else if (call.name === 'consultar_valor_pacote' && !clientAskedPrice(priceTurns)) {
             // Valor aberto só para quem perguntou o preço (pedir "orçamento" não conta)
             toolResult = 'NÃO PASSE VALORES: o cliente ainda não perguntou o preço (pedir "orçamento" não é perguntar o preço). Não escreva nenhum valor em R$ nem ofereça passar. Os pacotes estão no PDF; responda o que ele disse e conduza para a data e a visita.';
