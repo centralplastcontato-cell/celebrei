@@ -1,4 +1,5 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { sendContractForSignature } from "@/lib/contractSignature";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -222,64 +223,15 @@ export function EventDetailSheet({ open, onOpenChange, event, onEdit, onDelete, 
       toast({ title: "Nenhuma instância selecionada", description: "Selecione uma instância do WhatsApp.", variant: "destructive" });
       return;
     }
-    let leadId = contract.lead_id;
-    if (!leadId && contract.event_id) {
-      const { data: ev } = await supabase.from("company_events").select("lead_id").eq("id", contract.event_id).single();
-      leadId = ev?.lead_id || null;
-    }
-    if (!leadId) {
-      toast({ title: "Lead não vinculado", description: "Este contrato não possui um lead associado.", variant: "destructive" });
-      return;
-    }
-    const { data: lead } = await supabase.from("campaign_leads").select("name, whatsapp").eq("id", leadId).single();
-    if (!lead?.whatsapp) {
-      toast({ title: "Lead sem WhatsApp cadastrado", variant: "destructive" });
-      return;
-    }
     setSendingContractSign(contract.id);
     try {
-      const token = crypto.randomUUID();
-      const { error: sigErr } = await (supabase as any).from("contract_signatures").insert({
-        contract_id: contract.id,
-        company_id: event.company_id,
-        signer_name: lead.name,
-        signer_phone: lead.whatsapp,
-        token,
-      });
-      if (sigErr) {
-        toast({ title: "Erro ao criar assinatura", description: sigErr.message, variant: "destructive" });
-        return;
+      const { data: companyInfo } = await supabase.from("companies").select("name").eq("id", event.company_id).maybeSingle();
+      const r = await sendContractForSignature({ companyId: event.company_id, companyName: companyInfo?.name || "", contract, userId, instance: inst });
+      if (!r.ok) toast({ title: "Não consegui enviar para assinatura", description: r.error, variant: "destructive" });
+      else {
+        setSentSign(prev => new Set(prev).add(contract.id));
+        toast({ title: `Link de assinatura enviado via ${inst.unit || "WhatsApp"} ✅` });
       }
-      const signUrl = `${window.location.origin}/assinar-contrato/${token}`;
-
-      const phone = lead.whatsapp.replace(/\D/g, "");
-      const template = await getContractSendTemplate(event.company_id);
-      const { data: companyInfo } = await supabase.from("companies").select("name").eq("id", event.company_id).single();
-      const msg = resolveContractSendMessage(template, {
-        nome: lead.name,
-        link: signUrl,
-        nome_contrato: contract.nome_documento,
-        empresa: companyInfo?.name || "",
-      });
-      const { data: sendResult, error: sendErr } = await supabase.functions.invoke("wapi-send", {
-        body: { action: "send-text", instanceId: inst.instance_id, instanceToken: inst.instance_token, phone, message: msg },
-      });
-      const sendPayload = sendResult as { success?: boolean; error?: string } | null;
-
-      if (sendErr || sendPayload?.success === false) {
-        toast({
-          title: "Erro ao enviar link",
-          description: sendErr?.message || sendPayload?.error || "Falha no envio do link pelo WhatsApp.",
-          variant: "destructive",
-        });
-        await (supabase as any).from("contract_signatures").delete().eq("token", token);
-        return;
-      }
-
-      await (supabase as any).from("generated_contracts").update({ status: "aguardando_assinatura", signature_token: token }).eq("id", contract.id);
-      setSentSign(prev => new Set(prev).add(contract.id));
-      toast({ title: `Link de assinatura enviado via ${inst.unit || 'WhatsApp'} ✅` });
-      await logContractAction(event.company_id, contract.id, contract.template_id, "contract_sent_for_signature", userId, { lead_id: leadId, instance_unit: inst.unit });
       fetchGeneratedContracts();
     } finally {
       setSendingContractSign(null);

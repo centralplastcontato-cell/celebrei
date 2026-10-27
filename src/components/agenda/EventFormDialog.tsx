@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { sendContractForSignature } from "@/lib/contractSignature";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EventComplementaryTab } from "./EventComplementaryTab";
@@ -461,75 +462,14 @@ export function EventFormDialog({ open, onOpenChange, onSubmit, initialData, uni
 
   const handleContractSendSign = async (contract: typeof generatedContracts[0]) => {
     if (!currentCompany?.id || !userId) return;
-    let leadId = contract.lead_id;
-    if (!leadId && contract.event_id) {
-      const { data: ev } = await supabase.from("company_events").select("lead_id").eq("id", contract.event_id).single();
-      leadId = ev?.lead_id || null;
-    }
-    if (!leadId) {
-      toast({ title: "Lead não vinculado", description: "Este contrato não possui um lead associado.", variant: "destructive" });
-      return;
-    }
-    const { data: lead } = await supabase.from("campaign_leads").select("name, whatsapp").eq("id", leadId).single();
-    if (!lead?.whatsapp) {
-      toast({ title: "Lead sem WhatsApp cadastrado", variant: "destructive" });
-      return;
-    }
     setSendingContractSign(contract.id);
     try {
-      const token = crypto.randomUUID();
-      const { error: sigErr } = await (supabase as any).from("contract_signatures").insert({
-        contract_id: contract.id,
-        company_id: currentCompany.id,
-        signer_name: lead.name,
-        signer_phone: lead.whatsapp,
-        token,
-      });
-      if (sigErr) {
-        toast({ title: "Erro ao criar assinatura", description: sigErr.message, variant: "destructive" });
-        return;
-      }
-      const signUrl = `${window.location.origin}/assinar-contrato/${token}`;
-      const { data: instances } = await (supabase as any)
-        .from("wapi_instances")
-        .select("instance_id, instance_token")
-        .eq("company_id", currentCompany.id)
-        .eq("status", "connected")
-        .limit(1);
-      const instance = instances?.[0];
-      let signatureSent = false;
-      if (instance) {
-        const phone = lead.whatsapp.replace(/\D/g, "");
-        const template = await getContractSendTemplate(currentCompany.id);
-        const msg = resolveContractSendMessage(template, {
-          nome: lead.name,
-          link: signUrl,
-          nome_contrato: contract.nome_documento,
-          empresa: currentCompany.name,
-        });
-        const { data: sendResult, error: sendErr } = await supabase.functions.invoke("wapi-send", {
-          body: { action: "send-text", instanceId: instance.instance_id, instanceToken: instance.instance_token, phone, message: msg },
-        });
-        const sendPayload = sendResult as { success?: boolean; error?: string } | null;
-        if (sendErr || sendPayload?.success === false) {
-          toast({
-            title: "Erro ao enviar link",
-            description: sendErr?.message || sendPayload?.error || "Falha no envio pelo WhatsApp.",
-            variant: "destructive",
-          });
-          await (supabase as any).from("contract_signatures").delete().eq("token", token);
-        } else {
-          signatureSent = true;
-          await (supabase as any).from("generated_contracts").update({ status: "aguardando_assinatura", signature_token: token }).eq("id", contract.id);
-          setSentSign(prev => new Set(prev).add(contract.id));
-          toast({ title: "Link de assinatura enviado via WhatsApp ✅" });
-        }
-      } else {
-        await navigator.clipboard.writeText(signUrl);
-        toast({ title: "Link copiado!", description: "Nenhuma instância WhatsApp conectada. O link foi copiado." });
-      }
-      if (signatureSent) {
-        await logContractAction(currentCompany.id, contract.id, contract.template_id, "contract_sent_for_signature", userId, { lead_id: leadId });
+      const r = await sendContractForSignature({ companyId: currentCompany.id, companyName: currentCompany.name, contract, userId });
+      if (!r.ok) toast({ title: "Não consegui enviar para assinatura", description: r.error, variant: "destructive" });
+      else if (r.copied) toast({ title: "Link copiado!", description: "Nenhum WhatsApp conectado agora. Cole o link na conversa com o cliente." });
+      else {
+        setSentSign(prev => new Set(prev).add(contract.id));
+        toast({ title: `Link de assinatura enviado${r.unit ? ` via ${r.unit}` : ""} ✅` });
       }
       fetchGeneratedContracts();
     } finally {
