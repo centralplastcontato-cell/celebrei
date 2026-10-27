@@ -616,6 +616,8 @@ export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConver
   const externalSelectedUnitRef = useRef(externalSelectedUnit);
   externalSelectedUnitRef.current = externalSelectedUnit;
   const previousExternalSelectedUnitRef = useRef<string | null | undefined>(externalSelectedUnit);
+  // Unidade para onde a abertura por telefone trocou sozinha (o topo acompanha depois)
+  const phoneUnitSwitchRef = useRef<string | null>(null);
 
   const activeConversationStorageKey = useMemo(() => {
     const companyId = currentCompany?.id || getCurrentCompanyId();
@@ -729,7 +731,16 @@ export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConver
     previousExternalSelectedUnitRef.current = externalSelectedUnit;
 
     // O topo só passou a mostrar a unidade que já está aberta: nada a trocar
-    if (selectedInstance?.unit === externalSelectedUnit) return;
+    if (selectedInstance?.unit === externalSelectedUnit) {
+      phoneUnitSwitchRef.current = null;
+      return;
+    }
+
+    // Abriu por telefone uma conversa de outra unidade (aviso do sino) e o topo
+    // ainda não acompanhou: não volta para a unidade antiga (Patrícia, 27/10:
+    // a conversa do VENDAS 2 abria e fechava com o topo em VENDAS 3)
+    if (!didExternalUnitChange && phoneUnitSwitchRef.current && selectedInstance?.unit === phoneUnitSwitchRef.current) return;
+    phoneUnitSwitchRef.current = null;
 
     const storedConversation = readLastActiveConversation();
     // On remount/focus return, restore the last open chat before honoring
@@ -2549,6 +2560,7 @@ export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConver
 
         if (crossInstanceConv && targetInstance) {
           // Troca para a instancia da conversa e ja carrega a lista dela abaixo
+          phoneUnitSwitchRef.current = targetInstance.unit || null;
           setSelectedInstance(targetInstance);
           setSelectedConversation(crossInstanceConv as unknown as Conversation);
           onPhoneHandled?.();
