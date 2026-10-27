@@ -53,6 +53,9 @@ interface ClientFormData {
   // Festa: o pacote que fechou e os convidados (o buffet confere)
   pacote: string;
   convidados: string;
+  // Foto do documento (RG/CNH), no bucket privado client-documents
+  documento_arquivo?: string;
+  documento_nome?: string;
 }
 
 const EMPTY_FORM: ClientFormData = {
@@ -134,6 +137,9 @@ export default function PublicClientData() {
   const [packages, setPackages] = useState<string[]>([]);
   // WhatsApp e Instagram do buffet (os mesmos do site) para a tela final
   const [contacts, setContacts] = useState<{ whatsapp: string | null; instagram: string | null }>({ whatsapp: null, instagram: null });
+  // Documento com foto: o buffet escolhe se pede (off / optional / required)
+  const [documentMode, setDocumentMode] = useState<"off" | "optional" | "required">("off");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -150,6 +156,9 @@ export default function PublicClientData() {
       }
       supabase.rpc("get_client_data_packages" as any, { _token: token }).then(({ data: pk }) => {
         if (Array.isArray(pk)) setPackages((pk as Array<{ name: string }>).map((p) => p.name).filter(Boolean));
+      });
+      supabase.rpc("get_client_data_document_mode" as any, { _token: token }).then(({ data: mode, error: modeErr }) => {
+        if (!modeErr && (mode === "optional" || mode === "required")) setDocumentMode(mode);
       });
       setRequestInfo(info);
       setLoading(false);
@@ -186,6 +195,24 @@ export default function PublicClientData() {
     }
   };
 
+  const handleDocument = async (file: File | undefined) => {
+    if (!file || !requestInfo || !token) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Arquivo muito grande", description: "Envie uma foto ou PDF de até 10 MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingDoc(true);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+    const path = `${requestInfo.company_id}/${token}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("client-documents").upload(path, file, { contentType: file.type || undefined });
+    setUploadingDoc(false);
+    if (upErr) {
+      toast({ title: "Não consegui enviar o documento", description: "Tente de novo ou mande uma foto menor.", variant: "destructive" });
+      return;
+    }
+    setForm((prev) => ({ ...prev, documento_arquivo: path, documento_nome: file.name }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome.trim()) {
@@ -203,6 +230,10 @@ export default function PublicClientData() {
       return;
     }
     setCpfError(null);
+    if (documentMode === "required" && !form.documento_arquivo) {
+      toast({ title: "Envie a foto do documento", description: "RG ou CNH, frente com a foto.", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       const { error } = await supabase.rpc("submit_client_data_public", {
@@ -394,6 +425,29 @@ export default function PublicClientData() {
                   />
                 </div>
               </div>
+
+              {documentMode !== "off" && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                    Foto do documento (RG ou CNH){documentMode === "required" ? " *" : " (opcional)"}
+                  </Label>
+                  <label className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-3 text-sm ${form.documento_arquivo ? "border-green-500/50 bg-green-500/5" : "border-border bg-muted/30"}`}>
+                    <span className="min-w-0 truncate text-muted-foreground">
+                      {uploadingDoc ? "Enviando…" : form.documento_arquivo ? `✅ ${form.documento_nome || "Documento enviado"}` : "Toque para tirar uma foto ou escolher o arquivo"}
+                    </span>
+                    {uploadingDoc ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" /> : <span className="shrink-0 text-xs font-semibold text-primary">{form.documento_arquivo ? "Trocar" : "Enviar"}</span>}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      disabled={uploadingDoc}
+                      onChange={(e) => { handleDocument(e.target.files?.[0]); e.target.value = ""; }}
+                    />
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">A frente do documento, com a foto. Só o buffet vê.</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -659,7 +713,7 @@ export default function PublicClientData() {
 
           {/* Submit */}
           <div className="rounded-2xl border border-border/40 bg-card p-5 shadow-sm">
-            <Button type="submit" className="w-full h-12 rounded-xl text-base font-semibold gap-2 shadow-sm" disabled={submitting}>
+            <Button type="submit" className="w-full h-12 rounded-xl text-base font-semibold gap-2 shadow-sm" disabled={submitting || uploadingDoc}>
               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
               Enviar dados
             </Button>
