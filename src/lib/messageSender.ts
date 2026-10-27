@@ -3,7 +3,7 @@
 // Automações (follow-up, retorno combinado, confirmação de visita…) não têm
 // bolinha: ganham uma etiqueta curta com texto (senderTag), que dá para ler no celular.
 
-type Meta = { source?: unknown; type?: unknown } | null | undefined;
+type Meta = { source?: unknown; type?: unknown; form_type?: unknown } | null | undefined;
 
 export interface SenderDot {
   className: string;
@@ -35,6 +35,8 @@ const AUTOMATION_TAGS: Record<string, string> = {
 /** Etiqueta das mensagens enviadas por automação (Glaucia, 26/10: ninguém sabia quem tinha mandado). */
 export function senderTag(msg: { from_me: boolean; metadata?: unknown }): string | null {
   if (!msg.from_me) return null;
-  const source = metaOf(msg)?.source;
+  const meta = metaOf(msg);
+  const source = meta?.source;
+  if (source === "form_auto") return meta?.form_type === "avaliacao" ? "⭐ Avaliação automática" : "🍽️ Cardápio automático";
   return typeof source === "string" ? AUTOMATION_TAGS[source] ?? null : null;
 }

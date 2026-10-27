@@ -29,6 +29,7 @@ import { installEvolutionCallGuard } from "../_shared/evolution-guard.ts";
 import { claimSystemSendSlot } from "../_shared/system-send-pacing.ts";
 import { PARTY_SOON_ACTION, partySoon, partySoonLabel } from "../_shared/party-soon.ts";
 import { pacingHeldLeads } from "../_shared/auto-pacing.ts";
+import { type AutoFormType, FORM_AUTO_DEFAULT_DELAY_MIN, FORM_AUTO_DEFAULT_MESSAGES, FORM_AUTO_MAX_LATE_MS, FORM_SENT_ACTION, formAutoDue, formAutoLink, formSentRecord, type FormTemplateRow, partyEndMs, pickCardapioTemplate } from "../_shared/form-auto.ts";
 import { clientDataLink, clientDataThanks, DEFAULT_CLIENT_DATA_MESSAGE, DEFAULT_CLIENT_DATA_REMINDERS, dueReminder, fillClientDataTemplate, hasCpfInText, isOverdue, normalizeReminderHours, shortClientToken } from "../_shared/client-data.ts";
 
 type SupabaseAdmin = any;
@@ -472,6 +473,14 @@ Deno.serve(async (req) => {
     }
     if (clientDataResult.errors.length > 0) {
       console.error("[follow-up-check] Erros nos dados do contratante:", clientDataResult.errors);
+    }
+    // Formulários automáticos: cardápio depois do contrato, avaliação depois da festa
+    try {
+      const forms = await processFormAutoSends({ supabase });
+      if (forms.sent > 0) console.log(`[follow-up-check] Formulários automáticos: ${forms.sent} enviado(s)`);
+      if (forms.errors.length > 0) console.error("[follow-up-check] Erros nos formulários automáticos:", forms.errors);
+    } catch (err) {
+      console.error("[follow-up-check] Erro nos formulários automáticos:", err);
     }
 
     // Acompanhamento da Bia (Configurar IA → Follow-up): só nos números com a
@@ -3356,6 +3365,156 @@ async function processPostVisit({ supabase }: { supabase: SupabaseAdmin }): Prom
           new_value: text.slice(0, 200),
         });
         sent++;
+      }
+    } catch (err) {
+      errors.push(`empresa ${companyId}: ${String(err)}`);
+    }
+  }
+  return { sent, errors };
+}
+
+// Formulários automáticos (Automações → Formulários, Castelo 27/10), por buffet:
+// - cardápio: X min depois que o buffet gera o contrato da festa, com o cardápio
+//   do pacote (sem cardápio que case com o pacote não manda: avisa a equipe);
+// - avaliação: X horas depois que a festa termina.
+// Só no horário da equipe (nunca depois das 20h), uma vez por festa, e nunca se
+// o cliente já respondeu ou o link já foi mandado na conversa. Regras em _shared/form-auto.ts.
+async function processFormAutoSends({ supabase }: { supabase: SupabaseAdmin }): Promise<{ sent: number; errors: string[] }> {
+  const errors: string[] = [];
+  let sent = 0;
+  const { data: cfgs, error } = await supabase.from("form_automation_settings")
+    .select("company_id, form_type, message_template, auto_delay_minutes, auto_enabled_at")
+    .eq("auto_send", true).eq("is_enabled", true).in("form_type", ["cardapio", "avaliacao"]);
+  // Colunas novas ainda não criadas no banco: nada a fazer
+  if (error) return { sent, errors: /auto_send|auto_delay|auto_enabled/.test(String(error.message)) ? [] : [String(error.message)] };
+  if (!cfgs || cfgs.length === 0) return { sent, errors };
+
+  const nowMs = Date.now();
+  const todayYmd = new Date(nowMs - 3 * 3600000).toISOString().slice(0, 10);
+  const localHour = Number(new Date(nowMs).toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false })) % 24;
+  const isBlocked = await loadBlockedContacts(supabase);
+  const byCompany = new Map<string, any[]>();
+  for (const c of cfgs as any[]) byCompany.set(c.company_id, [...(byCompany.get(c.company_id) || []), c]);
+
+  for (const [companyId, list] of byCompany) {
+    try {
+      const [{ data: company }, { data: ai }] = await Promise.all([
+        supabase.from("companies").select("name, slug, custom_domain").eq("id", companyId).maybeSingle(),
+        supabase.from("ai_agent_settings").select("team_hours").eq("company_id", companyId).maybeSingle(),
+      ]);
+      if (!(isOpenAt(parseVisitHours(teamHoursText(ai?.team_hours)), nowMs) && localHour < 20)) continue;
+
+      for (const cfg of list) {
+        const type = cfg.form_type as AutoFormType;
+        const delay = Number.isFinite(Number(cfg.auto_delay_minutes)) && cfg.auto_delay_minutes !== null ? Number(cfg.auto_delay_minutes) : FORM_AUTO_DEFAULT_DELAY_MIN[type];
+        const enabledAtMs = cfg.auto_enabled_at ? Date.parse(cfg.auto_enabled_at) : null;
+        const sinceIso = new Date(nowMs - delay * 60000 - FORM_AUTO_MAX_LATE_MS[type]).toISOString();
+
+        // Festas candidatas e o momento de referência (contrato gerado / fim da festa)
+        const refByEvent = new Map<string, number>();
+        if (type === "cardapio") {
+          const { data: contracts } = await supabase.from("generated_contracts").select("event_id, created_at, status")
+            .eq("company_id", companyId).not("event_id", "is", null).neq("status", "cancelado").gte("created_at", sinceIso)
+            .order("created_at", { ascending: true }).limit(200);
+          for (const c of (contracts || []) as any[]) if (!refByEvent.has(c.event_id)) refByEvent.set(c.event_id, Date.parse(c.created_at));
+        } else {
+          const { data: events } = await supabase.from("company_events").select("id, event_date, start_time, end_time")
+            .eq("company_id", companyId).eq("status", "confirmado")
+            .gte("event_date", new Date(nowMs - 3 * 3600000 - 6 * 86400000).toISOString().slice(0, 10)).lte("event_date", todayYmd).limit(300);
+          for (const e of (events || []) as any[]) refByEvent.set(e.id, partyEndMs(e.event_date, e.start_time, e.end_time));
+        }
+        const dueIds = [...refByEvent].filter(([, ref]) => formAutoDue(type, ref, delay, enabledAtMs, nowMs)).map(([id]) => id);
+        if (dueIds.length === 0) continue;
+
+        const { data: templates } = await supabase.from(type === "cardapio" ? "cardapio_templates" : "evaluation_templates")
+          .select("id, name, slug").eq("company_id", companyId).eq("is_active", true).order("created_at", { ascending: true });
+        const tpls = (templates || []) as FormTemplateRow[];
+
+        for (const eventId of dueIds) {
+          const { data: ev } = await supabase.from("company_events")
+            .select("id, lead_id, event_date, status, package_name, title").eq("id", eventId).maybeSingle();
+          if (!ev || ev.status === "cancelado" || !ev.lead_id) continue;
+          if (type === "cardapio" && String(ev.event_date) < todayYmd) continue; // a festa já passou
+
+          // Já foi (automático ou pela Agenda) ou já respondeu: não manda de novo
+          const { data: prior } = await supabase.from("lead_history").select("id").eq("lead_id", ev.lead_id)
+            .in("action", [FORM_SENT_ACTION, "form_auto_skipped"]).like("new_value", `%"event_id":"${eventId}"%`).like("new_value", `%"form_type":"${type}"%`).limit(1);
+          if ((prior || []).length > 0) continue;
+          const { data: answered } = await supabase.from(type === "cardapio" ? "cardapio_responses" : "evaluation_responses").select("id").eq("event_id", eventId).limit(1);
+          if ((answered || []).length > 0) continue;
+
+          const { data: lead } = await supabase.from("campaign_leads").select("name, unit").eq("id", ev.lead_id).maybeSingle();
+          const template = type === "cardapio" ? pickCardapioTemplate(tpls, ev.package_name, company?.name) : (tpls[0] || null);
+          if (!template) {
+            // Sem cardápio para o pacote: avisa a equipe uma vez e não manda nada
+            await supabase.from("lead_history").insert({
+              lead_id: ev.lead_id, company_id: companyId, user_name: "Sistema", action: "form_auto_skipped",
+              new_value: formSentRecord({ form_type: type, template_id: "", event_id: eventId }),
+            });
+            if (type === "cardapio") {
+              const targets = await resolveUnitNotificationTargets(supabase, companyId, lead?.unit || null);
+              if (targets.length > 0) {
+                await supabase.from("notifications").insert(targets.map((uid: string) => ({
+                  user_id: uid, company_id: companyId, type: "lead_needs_human",
+                  title: `🍽️ Cardápio não enviado: ${firstNameOf(lead?.name) || ev.title || "festa"}`,
+                  message: ev.package_name ? `O pacote "${ev.package_name}" não tem um cardápio que combine. Mande pela Agenda.` : "A festa está sem pacote. Escolha o pacote e mande o cardápio pela Agenda.",
+                  data: { reason: "form_auto_skipped", lead_id: ev.lead_id, event_id: eventId },
+                  read: false,
+                })));
+              }
+            }
+            continue;
+          }
+
+          const { data: convs } = await supabase.from("wapi_conversations")
+            .select("id, instance_id, remote_jid, contact_phone").eq("lead_id", ev.lead_id).not("remote_jid", "like", "%@g.us%")
+            .order("last_message_at", { ascending: false }).limit(1);
+          const conv = ((convs || []) as any[])[0];
+          if (!conv || isBlocked(companyId, conv.remote_jid)) continue;
+          // Link desse formulário já mandado na conversa (envio manual de antes deste registro)
+          const { data: linkSent } = await supabase.from("wapi_messages").select("id").eq("conversation_id", conv.id).eq("from_me", true)
+            .like("content", `%/${type === "cardapio" ? "cardapio" : "avaliacao"}/%`).gte("timestamp", new Date(nowMs - 120 * 86400000).toISOString()).limit(1);
+          if ((linkSent || []).length > 0) continue;
+
+          const { data: inst } = await supabase.from("wapi_instances")
+            .select("id, instance_id, instance_token, client_token, provider, company_id, unit, status, is_active").eq("id", conv.instance_id).maybeSingle();
+          if (!inst || inst.is_active === false || inst.status !== "connected") continue;
+          const phone = String(conv.contact_phone || conv.remote_jid || "").replace(/@.*/, "").replace(/\D/g, "");
+          if (phone.length < 10) continue;
+
+          // Reserva a vez: se duas rodadas chegarem juntas, só a primeira manda
+          const record = formSentRecord({ form_type: type, template_id: template.id, event_id: eventId, template_name: template.name, auto: true });
+          const { data: mine } = await supabase.from("lead_history").insert({
+            lead_id: ev.lead_id, company_id: companyId, user_name: "Sistema", action: FORM_SENT_ACTION, new_value: record,
+          }).select("id, created_at").single();
+          if (!mine) continue;
+          const { data: first } = await supabase.from("lead_history").select("id").eq("lead_id", ev.lead_id).eq("action", FORM_SENT_ACTION)
+            .like("new_value", `%"event_id":"${eventId}"%`).like("new_value", `%"form_type":"${type}"%`).order("created_at", { ascending: true }).limit(1);
+          const undo = async () => { await supabase.from("lead_history").delete().eq("id", mine.id); };
+          if (((first || []) as any[])[0]?.id !== mine.id) { await undo(); continue; }
+          const slot = await claimSystemSendSlot(supabase, { id: inst.id, provider: inst.provider });
+          if (!slot.ok) { await undo(); continue; }
+
+          const link = formAutoLink(type, { customDomain: company?.custom_domain, companySlug: company?.slug, templateId: template.id, templateSlug: template.slug, eventId });
+          const [y, m, d] = String(ev.event_date).slice(0, 10).split("-");
+          const text = fillClientDataTemplate(String(cfg.message_template || "").trim() || FORM_AUTO_DEFAULT_MESSAGES[type], {
+            nome: firstNameOf(lead?.name) || null, empresa: company?.name || "", data_evento: `${d}/${m}/${y}`, link,
+          });
+          const res = await providerSendText(inst as any, phone, text);
+          if (!res.ok) {
+            await undo();
+            errors.push(`${type} (${eventId}): ${res.error}`);
+            continue;
+          }
+          const nowIso = new Date().toISOString();
+          await supabase.from("wapi_messages").upsert({
+            conversation_id: conv.id, message_id: res.messageId || `form_auto_${Date.now()}`,
+            from_me: true, message_type: "text", content: text, status: "sent", timestamp: nowIso, company_id: companyId,
+            metadata: { source: "form_auto", form_type: type, event_id: eventId },
+          }, { onConflict: "conversation_id,message_id", ignoreDuplicates: true });
+          await supabase.from("wapi_conversations").update({ last_message_at: nowIso, last_message_content: text.substring(0, 100), last_message_from_me: true }).eq("id", conv.id);
+          sent++;
+        }
       }
     } catch (err) {
       errors.push(`empresa ${companyId}: ${String(err)}`);

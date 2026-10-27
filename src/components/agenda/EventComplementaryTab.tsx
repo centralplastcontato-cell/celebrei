@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { filterCardapioTemplatesByPackage } from "@/lib/cardapioMatch";
+import { loadFormsSent, recordFormSent } from "@/lib/formSentHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,103 +49,6 @@ interface WapiInstance {
   status: string | null;
 }
 
-const MATCH_IGNORED_WORDS = new Set([
-  "a",
-  "o",
-  "as",
-  "os",
-  "da",
-  "de",
-  "do",
-  "das",
-  "dos",
-  "e",
-  "cardapio",
-  "pacote",
-  "formulario",
-  "template",
-]);
-
-const normalizeTemplateName = (value?: string | null) =>
-  (value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const tokenizeTemplateName = (value?: string | null) =>
-  normalizeTemplateName(value)
-    .split(" ")
-    .filter((token) => token && !MATCH_IGNORED_WORDS.has(token));
-
-const getCardapioMatchScore = (templateName: string, packageName: string) => {
-  const normalizedTemplate = normalizeTemplateName(templateName);
-  const normalizedPackage = normalizeTemplateName(packageName);
-
-  if (!normalizedTemplate || !normalizedPackage) return 0;
-  if (normalizedTemplate === normalizedPackage) return 1000;
-  if (normalizedTemplate.includes(normalizedPackage)) {
-    return 900 - Math.max(normalizedTemplate.length - normalizedPackage.length, 0);
-  }
-
-  const packageTokens = tokenizeTemplateName(packageName);
-  const templateTokens = tokenizeTemplateName(templateName);
-  if (packageTokens.length === 0 || templateTokens.length === 0) return 0;
-
-  const overlap = packageTokens.filter((token) => templateTokens.includes(token)).length;
-  if (overlap === 0) return 0;
-
-  const missingTokens = packageTokens.length - overlap;
-  const extraTokens = templateTokens.length - overlap;
-
-  return overlap * 100 - missingTokens * 35 - extraTokens * 5;
-};
-
-const filterCardapioTemplatesByPackage = (templates: FormTemplate[], packageName?: string | null) => {
-  if (!packageName || packageName === "Sem pacote") return templates;
-
-  const packageTokens = tokenizeTemplateName(packageName);
-  if (packageTokens.length === 0) return templates;
-
-  const scoredTemplates = templates
-    .map((template) => ({
-      template,
-      score: getCardapioMatchScore(template.name, packageName),
-    }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  if (scoredTemplates.length === 0) return [];
-
-  const bestScore = scoredTemplates[0].score;
-  const bestTemplates = scoredTemplates
-    .filter(({ score }) => score === bestScore)
-    .map(({ template }) => template);
-
-  if (bestTemplates.length === 1) return bestTemplates;
-
-  const strictMatches = bestTemplates.filter((template) => {
-    const templateTokens = tokenizeTemplateName(template.name);
-    return packageTokens.every((token) => templateTokens.includes(token));
-  });
-
-  if (strictMatches.length > 0) return [strictMatches[0]];
-
-  // Tiebreaker: prefer the template that contains the LAST significant token of
-  // the package name (usually the differentiator, e.g. "PREMIUM" in "CASTELO PREMIUM").
-  for (let i = packageTokens.length - 1; i >= 0; i--) {
-    const token = packageTokens[i];
-    const match = bestTemplates.find((template) =>
-      tokenizeTemplateName(template.name).includes(token),
-    );
-    if (match) return [match];
-  }
-
-  return [bestTemplates[0]];
-};
-
 interface EventComplementaryTabProps {
   eventId: string;
   companyId: string;
@@ -189,24 +94,12 @@ export function EventComplementaryTab({
       });
   }, [companyId, form.unit]);
 
-  // Load sent form history from lead_history
+  // Formulários já enviados para esta festa (histórico do lead)
   useEffect(() => {
     if (!eventId || !companyId) return;
-    supabase
-      .from("lead_history")
-      .select("details")
-      .eq("action", "form_sent_whatsapp")
-      .contains("details", JSON.stringify({ event_id: eventId }))
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const keys = new Set<string>();
-          data.forEach((row: any) => {
-            const d = typeof row.details === "string" ? JSON.parse(row.details) : row.details;
-            if (d?.form_type && d?.template_id) keys.add(`${d.form_type}-${d.template_id}`);
-          });
-          setSentForms(keys);
-        }
-      });
+    loadFormsSent(eventId).then((records) => {
+      if (records.length > 0) setSentForms(new Set(records.map((r) => `${r.form_type}-${r.template_id}`)));
+    });
   }, [eventId, companyId]);
 
   useEffect(() => {
@@ -273,7 +166,7 @@ export function EventComplementaryTab({
           type: "cardapio",
           label: "Cardápio",
           icon: UtensilsCrossed,
-          templates: filterCardapioTemplatesByPackage((cardapioTemplates || []) as FormTemplate[], form.package_name),
+          templates: filterCardapioTemplatesByPackage((cardapioTemplates || []) as FormTemplate[], form.package_name, companySlug),
           responses: mapResponses(cardapioResponses),
           publicPath: "cardapio",
         },
@@ -384,7 +277,13 @@ export function EventComplementaryTab({
       const rawTemplate = automationSettings?.message_template || FORM_TYPE_DEFAULT_MESSAGES[section.type] || "";
 
       // Get lead name (contratante), NOT event title (aniversariante)
-      const leadName = form.lead_name || form.parent_names || "Cliente";
+      // A festa aberta por alguns caminhos não traz o nome do lead: busca antes de cair em "Cliente"
+      let linkedLeadName = form.lead_name || null;
+      if (!linkedLeadName && form.lead_id) {
+        const { data: leadRow } = await supabase.from("campaign_leads").select("name").eq("id", form.lead_id).maybeSingle();
+        linkedLeadName = leadRow?.name || null;
+      }
+      const leadName = linkedLeadName || form.parent_names || "Cliente";
       const firstName = leadName.split(" ")[0];
       const eventDate = form.event_date ? format(new Date(form.event_date + "T12:00:00"), "dd/MM/yyyy") : "";
 
@@ -435,12 +334,7 @@ export function EventComplementaryTab({
       // Persist sent status
       setSentForms(prev => new Set(prev).add(key));
       if (form.lead_id) {
-        await supabase.from("lead_history").insert({
-          lead_id: form.lead_id,
-          company_id: companyId,
-          action: "form_sent_whatsapp",
-          details: { form_type: section.type, template_id: template.id, event_id: eventId, template_name: template.name },
-        });
+        await recordFormSent(form.lead_id, companyId, { form_type: section.type, template_id: template.id, event_id: eventId, template_name: template.name });
       }
 
       toast({ title: `Formulário de ${section.label} enviado via WhatsApp!` });

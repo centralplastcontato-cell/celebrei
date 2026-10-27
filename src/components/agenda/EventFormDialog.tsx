@@ -807,6 +807,17 @@ export function EventFormDialog({ open, onOpenChange, onSubmit, initialData, uni
     draftHydratedRef.current = true;
   }, [open, initialData, draftStorageKey]);
 
+  // Festa aberta sem o nome do lead (alguns caminhos não trazem): busca, para
+  // as mensagens não saírem "Olá Cliente!" (Claudia, 27/10)
+  useEffect(() => {
+    if (!open || !form.lead_id || form.lead_name) return;
+    let cancelled = false;
+    supabase.from("campaign_leads").select("name").eq("id", form.lead_id).maybeSingle().then(({ data }) => {
+      if (!cancelled && data?.name) setForm((prev) => (prev.lead_id === form.lead_id && !prev.lead_name ? { ...prev, lead_name: data.name } : prev));
+    });
+    return () => { cancelled = true; };
+  }, [open, form.lead_id, form.lead_name]);
+
   useEffect(() => {
     if (!open || !draftStorageKey || !draftHydratedRef.current) return;
 
