@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SelectOrCustom } from "./ai/SelectOrCustom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -181,6 +182,10 @@ export function AiQuestionnaireTab({ companyId }: { companyId: string }) {
                 </Label>
                 {q.hint && <p className="text-[11px] text-muted-foreground">{q.hint}</p>}
                 {q.type === "select" && (
+                  q.allowCustom ? (
+                    <SelectOrCustom value={typeof answers[q.key] === "string" ? (answers[q.key] as string) : ""} options={q.options || []} onChange={(v) => set(q.key, v)}
+                      triggerClassName="h-auto min-h-10 bg-card border-border shadow-sm text-left whitespace-normal" />
+                  ) : (
                   <Select value={typeof answers[q.key] === "string" ? (answers[q.key] as string) : ""} onValueChange={(v) => set(q.key, v)}>
                     <SelectTrigger className="h-auto min-h-10 bg-card border-border shadow-sm text-left whitespace-normal">
                       <SelectValue placeholder="Selecione uma opção" />
@@ -189,6 +194,7 @@ export function AiQuestionnaireTab({ companyId }: { companyId: string }) {
                       {(q.options || []).map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  )
                 )}
                 {q.type === "multi" && (
                   <div className="space-y-2 rounded-xl border border-border bg-card p-3">
