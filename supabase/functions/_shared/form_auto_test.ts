@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/assert_equals.ts";
-import { formAutoDue, formAutoLink, partyEndMs, pickCardapioTemplate } from "./form-auto.ts";
+import { formAutoDue, formAutoLink, partyEndMs, partyStartMs, pickCardapioTemplate, prefestaDue } from "./form-auto.ts";
 
 const CASTELO = [
   { id: "c", name: "Cardápio Festa Castelo", slug: "cardapio-festa-castelo" },
@@ -44,4 +44,16 @@ Deno.test("formAutoDue: espera o tempo, não pega o que é de antes de ligar nem
   assertEquals(formAutoDue("cardapio", ref, 20, ref + 1, ref + 21 * 60000), false);
   assertEquals(formAutoDue("cardapio", ref, 20, null, ref + 5 * 86400000), false);
   assertEquals(formAutoDue("avaliacao", ref, 1440, null, ref + 25 * 3600000), true);
+});
+
+Deno.test("prefestaDue: X dias antes, só festa que não começou e só depois de ligar", () => {
+  const start = partyStartMs("2026-11-14", "19:00");
+  assertEquals(new Date(start).toISOString(), "2026-11-14T22:00:00.000Z");
+  const week = 7 * 1440;
+  assertEquals(prefestaDue(start, week, null, start - 8 * 86400000), false);
+  assertEquals(prefestaDue(start, week, null, start - 6 * 86400000), true);
+  assertEquals(prefestaDue(start, week, null, start + 60000), false);
+  // Ligou ontem, festa daqui a 3 dias: o momento (7 dias antes) foi antes de ligar
+  assertEquals(prefestaDue(start, week, start - 4 * 86400000, start - 3 * 86400000), false);
+  assertEquals(new Date(partyStartMs("2026-11-14", null)).toISOString(), "2026-11-14T15:00:00.000Z");
 });

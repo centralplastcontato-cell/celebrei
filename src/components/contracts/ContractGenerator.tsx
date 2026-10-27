@@ -13,7 +13,7 @@ import { resolveSystemVariables, findUnresolvedVariables, appendExtensoToValues,
 import { ContractPreviewPrint } from "./ContractPreviewPrint";
 import { ContractDocumentViewer } from "./ContractDocumentViewer";
 import { format } from "date-fns";
-import { logContractAction } from "./contractAuditHelpers";
+import { logContractAction, autoSendContractOnGenerate } from "./contractAuditHelpers";
 import { formatCPF, isValidCPF } from "@/lib/mask-utils";
 
 interface Props { userId: string; onClose: () => void; }
@@ -286,6 +286,17 @@ export function ContractGenerator({ userId, onClose }: Props) {
       await logContractAction(currentCompany.id, null, selectedModel.id, "generation_failed", userId, { error: error.message });
     } else {
       toast({ title: "Contrato gerado com sucesso! ✅" });
+      // Envio automático ligado: manda o PDF pelo WhatsApp (o cardápio sai depois, pelo servidor)
+      if (contractResult?.id) {
+        autoSendContractOnGenerate(currentCompany.id, {
+          id: contractResult.id, lead_id: leadData?.id || null, event_id: selectedEventId || null, content: renderedContent,
+          name: `Contrato — ${leadData?.name || "Lead"} — ${eventData?.event_date ? format(new Date(eventData.event_date + "T12:00:00"), "dd/MM/yyyy") : ""}`,
+          template_id: selectedModel.id,
+        }, userId).then((r) => {
+          if (r.sent) toast({ title: "Contrato enviado ao cliente pelo WhatsApp ✅" });
+          else if (r.error) toast({ title: "Contrato gerado, mas não foi enviado pelo WhatsApp", description: r.error, variant: "destructive" });
+        });
+      }
       // Log success
       await logContractAction(currentCompany.id, contractResult?.id, selectedModel.id, "contract_generated", userId, {
         event_id: selectedEventId,

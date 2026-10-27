@@ -27,9 +27,16 @@ interface FormConfig {
   auto_enabled_at?: string | null;
 }
 
-// Cardápio: minutos depois de gerar o contrato; avaliação: horas depois da festa
-const AUTO_TYPES = new Set(["cardapio", "avaliacao"]);
-const AUTO_DEFAULT_DELAY: Record<string, number> = { cardapio: 20, avaliacao: 1440 };
+// Pré-festa: dias antes da festa; cardápio: minutos depois de gerar o contrato;
+// avaliação: horas depois da festa; contrato via WhatsApp: na hora em que gera
+const AUTO_TYPES = new Set(["prefesta", "cardapio", "avaliacao", "contrato_whatsapp"]);
+const AUTO_DEFAULT_DELAY: Record<string, number> = { prefesta: 7 * 1440, cardapio: 20, avaliacao: 1440, contrato_whatsapp: 0 };
+const PREFESTA_DAYS = [1, 2, 3, 5, 7, 10, 14];
+// Cards sem envio automático próprio: explica onde fica (o seletor antigo não fazia nada)
+const MANUAL_NOTES: Record<string, string> = {
+  contrato: "📝 O envio automático deste formulário fica no card azul \"Dados do Contratante: envio e cobranças\", no topo desta página (sai sozinho ao marcar \"Fechado\").",
+  contrato_envio: "🖐️ Sai pelo botão \"Enviar para assinatura\" do contrato: o link de assinatura só existe depois que a equipe prepara o contrato.",
+};
 const CARDAPIO_DELAYS = [10, 20, 30, 60, 120];
 const AVALIACAO_DELAY_HOURS = [2, 6, 12, 24, 48, 72];
 
@@ -313,6 +320,10 @@ export function FormAutomationSection() {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {config.form_type === "cardapio"
                               ? "Manda o cardápio sozinho depois que o contrato da festa é gerado"
+                              : config.form_type === "prefesta"
+                              ? "Manda o pré-festa sozinho alguns dias antes da festa"
+                              : config.form_type === "contrato_whatsapp"
+                              ? "Manda o PDF do contrato com esta mensagem assim que a equipe gera o contrato"
                               : "Manda a avaliação sozinha depois que a festa termina"}
                           </p>
                         </div>
@@ -321,7 +332,12 @@ export function FormAutomationSection() {
                           onCheckedChange={(checked) => updateConfig(config.form_type, "auto_send", checked)}
                         />
                       </div>
-                      {config.auto_send && (
+                      {config.auto_send && config.form_type === "contrato_whatsapp" && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          ⚡ Sai na hora em que alguém da equipe clica em "Gerar contrato" (o PDF é montado nessa tela), pelo WhatsApp do buffet. Só se a festa tiver cliente com WhatsApp.
+                        </p>
+                      )}
+                      {config.auto_send && config.form_type !== "contrato_whatsapp" && (
                         <>
                           <div className="flex flex-wrap items-center gap-2 text-sm">
                             <span>Enviar</span>
@@ -331,7 +347,11 @@ export function FormAutomationSection() {
                             >
                               <SelectTrigger className="h-9 w-[130px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                {config.form_type === "cardapio"
+                                {config.form_type === "prefesta"
+                                  ? PREFESTA_DAYS.map((d) => (
+                                      <SelectItem key={d} value={String(d * 1440)}>{d} {d === 1 ? "dia" : "dias"}</SelectItem>
+                                    ))
+                                  : config.form_type === "cardapio"
                                   ? CARDAPIO_DELAYS.map((m) => (
                                       <SelectItem key={m} value={String(m)}>{m < 60 ? `${m} minutos` : `${m / 60} ${m === 60 ? "hora" : "horas"}`}</SelectItem>
                                     ))
@@ -340,7 +360,7 @@ export function FormAutomationSection() {
                                     ))}
                               </SelectContent>
                             </Select>
-                            <span>{config.form_type === "cardapio" ? "depois de gerar o contrato" : "depois do fim da festa"}</span>
+                            <span>{config.form_type === "cardapio" ? "depois de gerar o contrato" : config.form_type === "prefesta" ? "antes da festa" : "depois do fim da festa"}</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             🕘 Só sai no horário de atendimento da equipe (nunca depois das 20h); se cair fora, sai no próximo horário.
@@ -351,6 +371,10 @@ export function FormAutomationSection() {
                           </p>
                         </>
                       )}
+                    </div>
+                  ) : MANUAL_NOTES[config.form_type] ? (
+                    <div className="rounded-lg bg-muted/50 p-4">
+                      <p className="text-xs text-muted-foreground leading-relaxed">{MANUAL_NOTES[config.form_type]}</p>
                     </div>
                   ) : (
                   <div className="rounded-lg bg-muted/50 p-4 space-y-4">

@@ -1,10 +1,11 @@
-// Envio automático de formulários da festa (Automações → Formulários):
+// Envio automático de formulários da festa (Mensagens automáticas → Formulários):
+// - pré-festa: X dias antes da festa;
 // - cardápio: X minutos depois que o buffet gera o contrato da festa;
 // - avaliação (pós-festa): X horas depois que a festa termina.
 // Só no horário de atendimento (nunca depois das 20h), uma vez por festa.
 // Regras puras — quem envia é o follow-up-check.
 
-export type AutoFormType = "cardapio" | "avaliacao";
+export type AutoFormType = "prefesta" | "cardapio" | "avaliacao";
 
 export interface FormTemplateRow {
   id: string;
@@ -71,7 +72,8 @@ export function pickCardapioTemplate<T extends FormTemplateRow>(templates: T[], 
   return best[0];
 }
 
-const PUBLIC_PATH: Record<AutoFormType, string> = { cardapio: "cardapio", avaliacao: "avaliacao" };
+const PUBLIC_PATH: Record<AutoFormType, string> = { prefesta: "pre-festa", cardapio: "cardapio", avaliacao: "avaliacao" };
+export const formAutoPath = (type: AutoFormType) => PUBLIC_PATH[type];
 
 /**
  * Link do formulário no domínio do buffet (igual ao link dos dados do
@@ -111,6 +113,7 @@ export function partyEndMs(eventYmd: string, startTime: string | null | undefine
 
 // Depois disso o envio perdeu o sentido (ex.: o sistema ficou parado): não manda mais
 export const FORM_AUTO_MAX_LATE_MS: Record<AutoFormType, number> = {
+  prefesta: 30 * 86400000, // até a festa (quem chama confere que ela ainda não começou)
   cardapio: 3 * 86400000,
   avaliacao: 4 * 86400000,
 };
@@ -128,12 +131,29 @@ export function formAutoDue(type: AutoFormType, refMs: number, delayMinutes: num
 
 // Iguais aos da tela (FormAutomationSection) — valem quando o buffet não mudou o texto
 export const FORM_AUTO_DEFAULT_MESSAGES: Record<AutoFormType, string> = {
+  prefesta: "Olá {{nome}}! 🎉\n\nSua festa está chegando! Para garantir que tudo saia perfeito, precisamos de algumas informações.\n\nPreencha o formulário abaixo:\n{{link}}",
   cardapio: "Olá {{nome}}! 🍽️\n\nVamos definir o cardápio da sua festa? Acesse o link abaixo e escolha as opções:\n\n{{link}}",
   avaliacao: "Olá {{nome}}! ⭐\n\nEsperamos que a festa tenha sido incrível! 🎊\n\nNos ajude a melhorar cada vez mais respondendo nossa avaliação:\n{{link}}",
 };
 
-// Sem ajuste salvo: cardápio 20 min depois do contrato; avaliação 24 h depois da festa
-export const FORM_AUTO_DEFAULT_DELAY_MIN: Record<AutoFormType, number> = { cardapio: 20, avaliacao: 1440 };
+// Sem ajuste salvo: pré-festa 7 dias antes; cardápio 20 min depois do contrato; avaliação 24 h depois da festa
+export const FORM_AUTO_DEFAULT_DELAY_MIN: Record<AutoFormType, number> = { prefesta: 7 * 1440, cardapio: 20, avaliacao: 1440 };
+
+/** Início da festa (horário de Brasília); sem horário, meio-dia */
+export function partyStartMs(eventYmd: string, startTime: string | null | undefined): number {
+  const start = hm(startTime);
+  return brtMs(String(eventYmd).slice(0, 10), start ? start[0] : 12, start ? start[1] : 0);
+}
+
+/**
+ * Pré-festa: X min (dias × 1440) antes do início. Só para festa que ainda não
+ * começou, e só quando a hora de mandar caiu depois de ligar a automação
+ * (ligar não dispara para todas as festas da semana de uma vez).
+ */
+export function prefestaDue(startMs: number, minutesBefore: number, enabledAtMs: number | null, nowMs: number): boolean {
+  if (!Number.isFinite(startMs) || nowMs >= startMs) return false;
+  return formAutoDue("prefesta", startMs - Math.max(0, minutesBefore) * 60000, 0, enabledAtMs, nowMs);
+}
 
 /** Registro no histórico do lead (dá para saber depois, na Agenda, que já foi) */
 export const FORM_SENT_ACTION = "form_sent_whatsapp";

@@ -496,3 +496,35 @@ export function resolveContractSendMessage(
 ): string {
   return resolveFormAutomationMessage(template, vars);
 }
+
+/**
+ * "Contrato via WhatsApp" com envio automático ligado (Mensagens automáticas →
+ * Formulários): manda o PDF assim que a equipe gera o contrato. O PDF é montado
+ * no navegador, por isso sai daqui e não do servidor. Desligado: não faz nada.
+ */
+export async function autoSendContractOnGenerate(
+  companyId: string,
+  contract: { id: string; lead_id: string | null; event_id: string | null; content: string; name: string; template_id: string | null },
+  userId: string,
+): Promise<{ sent: boolean; error?: string }> {
+  const { data: cfg, error: cfgErr } = await (supabase as any)
+    .from("form_automation_settings")
+    .select("is_enabled, auto_send")
+    .eq("company_id", companyId)
+    .eq("form_type", "contrato_whatsapp")
+    .maybeSingle();
+  if (cfgErr || !cfg?.auto_send || cfg.is_enabled === false) return { sent: false };
+
+  let leadId = contract.lead_id;
+  if (!leadId && contract.event_id) {
+    const { data: ev } = await supabase.from("company_events").select("lead_id").eq("id", contract.event_id).maybeSingle();
+    leadId = ev?.lead_id || null;
+  }
+  if (!leadId) return { sent: false, error: "Contrato sem cliente vinculado" };
+
+  const result = await sendContractViaWhatsApp(companyId, leadId, contract.content, contract.name);
+  if (!result.success) return { sent: false, error: result.error };
+  await supabase.from("generated_contracts").update({ status: "enviado" }).eq("id", contract.id).eq("status", "gerado");
+  await logContractAction(companyId, contract.id, contract.template_id, "contract_sent_whatsapp", userId, { lead_id: leadId, auto: true });
+  return { sent: true };
+}

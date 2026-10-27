@@ -10,7 +10,7 @@ import { getCompanyLogoOverride } from "@/lib/companyAssetOverrides";
 import { toast } from "@/hooks/use-toast";
 import { resolveSystemVariables, findUnresolvedVariables, appendExtensoToValues, type VariableContext } from "@/lib/template-resolver";
 import { ContractDocumentViewer } from "./ContractDocumentViewer";
-import { logContractAction } from "./contractAuditHelpers";
+import { logContractAction, autoSendContractOnGenerate } from "./contractAuditHelpers";
 import { format } from "date-fns";
 
 interface EventContractDialogProps {
@@ -322,6 +322,15 @@ export function EventContractDialog({ open, onOpenChange, eventId, modelId, user
       });
 
       toast({ title: "Contrato gerado com sucesso! ✅", description: "O contrato foi congelado e está disponível para visualização e impressão." });
+      // Envio automático ligado: manda o PDF pelo WhatsApp (o cardápio sai depois, pelo servidor)
+      if (contractResult?.id) {
+        const companyId = currentCompany.id;
+        autoSendContractOnGenerate(companyId, { id: contractResult.id, lead_id: leadData?.id || null, event_id: eventId, content: renderedContent, name: docName, template_id: model.id }, userId)
+          .then((r) => {
+            if (r.sent) toast({ title: "Contrato enviado ao cliente pelo WhatsApp ✅" });
+            else if (r.error) toast({ title: "Contrato gerado, mas não foi enviado pelo WhatsApp", description: r.error, variant: "destructive" });
+          });
+      }
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Erro ao gerar contrato", description: err.message, variant: "destructive" });
