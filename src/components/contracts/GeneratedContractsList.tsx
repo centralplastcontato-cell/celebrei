@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sendContractForSignature } from "@/lib/contractSignature";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -149,102 +150,14 @@ export function GeneratedContractsList({ userId }: Props) {
 
   const handleSendForSignature = async (contract: GeneratedContract) => {
     if (!currentCompany?.id) return;
-    let leadId = contract.lead_id;
-    if (!leadId && contract.event_id) {
-      const { data: ev } = await supabase.from("company_events").select("lead_id").eq("id", contract.event_id).single();
-      leadId = ev?.lead_id || null;
-    }
-    if (!leadId) {
-      toast({ title: "Lead não vinculado", description: "Este contrato não possui um lead associado.", variant: "destructive" });
-      return;
-    }
-    // Get lead info
-    const { data: lead } = await supabase.from("campaign_leads").select("name, whatsapp").eq("id", leadId).single();
-    if (!lead?.whatsapp) {
-      toast({ title: "Lead sem WhatsApp cadastrado", variant: "destructive" });
-      return;
-    }
     setSendingSign(contract.id);
     try {
-      const token = crypto.randomUUID();
-      // Create signature record
-      const { error: sigErr } = await (supabase as any).from("contract_signatures").insert({
-        contract_id: contract.id,
-        company_id: currentCompany.id,
-        signer_name: lead.name,
-        signer_phone: lead.whatsapp,
-        token,
-      });
-      if (sigErr) {
-        toast({ title: "Erro ao criar assinatura", description: sigErr.message, variant: "destructive" });
-        return;
-      }
-
-      // Build sign URL
-      const baseUrl = window.location.origin;
-      const signUrl = `${baseUrl}/assinar-contrato/${token}`;
-
-      // Send link via WhatsApp
-      const { data: instances } = await (supabase as any)
-        .from("wapi_instances")
-        .select("instance_id, instance_token")
-        .eq("company_id", currentCompany.id)
-        .eq("status", "connected")
-        .limit(1);
-      const instance = instances?.[0];
-      let signatureSent = false;
-      if (instance) {
-        // Verify instance is actually connected (live check)
-        const { data: statusData } = await supabase.functions.invoke("wapi-send", {
-          body: { action: "get-status", instanceId: instance.instance_id, instanceToken: instance.instance_token },
-        });
-        const statusPayload = statusData as { connected?: boolean; status?: string } | null;
-        if (statusPayload?.connected !== true) {
-          toast({
-            title: "Instância WhatsApp desconectada",
-            description: `A instância está ${statusPayload?.status || "offline"}. Reconecte antes de enviar.`,
-            variant: "destructive",
-          });
-          await (supabase as any).from("contract_signatures").delete().eq("token", token);
-          return;
-        }
-
-        const phone = lead.whatsapp.replace(/\D/g, "");
-        const template = await getContractSendTemplate(currentCompany.id);
-        const msg = resolveContractSendMessage(template, {
-          nome: lead.name,
-          link: signUrl,
-          nome_contrato: contract.nome_documento,
-          empresa: currentCompany.name,
-        });
-        const { data: sendResult, error: sendErr } = await supabase.functions.invoke("wapi-send", {
-          body: { action: "send-text", instanceId: instance.instance_id, instanceToken: instance.instance_token, phone, message: msg },
-        });
-        const sendPayload = sendResult as { success?: boolean; error?: string } | null;
-        if (sendErr || sendPayload?.success === false) {
-          toast({
-            title: "Erro ao enviar link",
-            description: sendErr?.message || sendPayload?.error || "Falha no envio pelo WhatsApp.",
-            variant: "destructive",
-          });
-          // Rollback: remove signature record since send failed
-          await (supabase as any).from("contract_signatures").delete().eq("token", token);
-        } else {
-          signatureSent = true;
-          // Only update status AFTER confirmed send success
-          await (supabase as any).from("generated_contracts").update({ status: "aguardando_assinatura", signature_token: token }).eq("id", contract.id);
-          toast({ title: "Link de assinatura enviado via WhatsApp ✅" });
-        }
-      } else {
-        // No instance — update status and copy link as fallback
-        await (supabase as any).from("generated_contracts").update({ status: "aguardando_assinatura", signature_token: token }).eq("id", contract.id);
-        await navigator.clipboard.writeText(signUrl);
-        toast({ title: "Link copiado!", description: "Nenhuma instância WhatsApp conectada. O link foi copiado para a área de transferência." });
-        signatureSent = true;
-      }
-      if (signatureSent) {
+      const r = await sendContractForSignature({ companyId: currentCompany.id, companyName: currentCompany.name, contract, userId });
+      if (!r.ok) toast({ title: "Não consegui enviar para assinatura", description: r.error, variant: "destructive" });
+      else if (r.copied) toast({ title: "Link copiado!", description: "Nenhum WhatsApp conectado agora. Cole o link na conversa com o cliente." });
+      else {
         setSentSign(prev => new Set(prev).add(contract.id));
-        await logContractAction(currentCompany.id, contract.id, contract.template_id, "contract_sent_for_signature", userId, { lead_id: leadId });
+        toast({ title: `Link de assinatura enviado${r.unit ? ` via ${r.unit}` : ""} ✅` });
       }
       fetchContracts();
     } finally {
