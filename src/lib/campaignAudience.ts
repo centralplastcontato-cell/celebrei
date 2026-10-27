@@ -71,6 +71,17 @@ export function prepareAudience<T extends AudienceCandidate>(
   // Escolher "Perdido" no filtro traz só os perdidos, não todos os fechados
   for (const st of opts.chosenStatuses || []) closed.delete(st);
 
+  // Festa marcada vale pelo TELEFONE: se a festa está num cadastro da cliente,
+  // os outros cadastros dela (repetido no CRM ou na Base) também ficam de fora
+  const partyTails = new Set<string>();
+  if (opts.partyLeadIds?.size) {
+    for (const l of leads) {
+      if (!opts.partyLeadIds.has(l.id)) continue;
+      const t = phoneTail(l.whatsapp);
+      if (t) partyTails.add(t);
+    }
+  }
+
   // Um por telefone: o do CRM vale mais que o da Base (tem situação de verdade)
   const ordered = [...leads].sort((a, b) => (a.source === b.source ? 0 : a.source === "crm" ? -1 : 1));
   const seen = new Set<string>();
@@ -81,7 +92,7 @@ export function prepareAudience<T extends AudienceCandidate>(
     if (opts.optoutTails.has(tail)) { hidden.optout++; continue; }
     if (seen.has(tail)) { hidden.duplicate++; continue; }
     seen.add(tail);
-    if (opts.partyLeadIds?.has(lead.id)) { hidden.party++; continue; }
+    if (opts.partyLeadIds?.has(lead.id) || partyTails.has(tail)) { hidden.party++; continue; }
     if (!opts.includeClosed && closed.has(lead.status)) { hidden.closed++; continue; }
     if (!opts.includeChatting && opts.chatTails?.has(tail)) { hidden.chatting++; continue; }
     if (!opts.includeRecent && opts.recentTails.has(tail)) { hidden.recent++; continue; }

@@ -114,6 +114,16 @@ describe("prepareAudience: festa marcada, conversa em andamento e filtro de situ
     expect(prepareAudience(leads, { ...opts, includeChatting: true }).available.map((l) => l.id)).toEqual(["b"]);
   });
 
+  it("festa marcada vale pelo telefone: outro cadastro da mesma cliente também fica de fora", () => {
+    const dupLeads = [
+      { id: "z", whatsapp: "5515999990001", status: "novo", source: "crm" as const }, // repetido, sem festa, vem antes
+      ...leads,
+    ];
+    const r = prepareAudience(dupLeads, { ...base, partyLeadIds: new Set(["a"]) });
+    expect(r.available.map((l) => l.id)).toEqual(["b"]);
+    expect(r.hidden.party).toBe(1);
+  });
+
   it("escolher Perdido no filtro traz os perdidos, mas não os fechados", () => {
     const r = prepareAudience(leads, { ...base, chosenStatuses: ["perdido"] });
     expect(r.available.map((l) => l.id)).toEqual(["a", "b", "c"]);
