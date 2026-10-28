@@ -12,6 +12,7 @@ const NAV = [
   { id: "como-funciona", label: "Como funciona" },
   { id: "recursos", label: "Recursos" },
   { id: "demo", label: "Demonstração" },
+  { id: "plano", label: "Plano" },
   { id: "por-que", label: "Por que a Celebrei" },
 ];
 
@@ -62,15 +63,13 @@ export default function HubHeader({ onOpenWizard }: HubHeaderProps) {
         <a href="/hub-login" className="text-[15px] font-semibold text-slate-600 transition-colors [@media(hover:hover)]:hover:text-[#0F1222]">
           Entrar
         </a>
-        <a href="/comecar" className="hidden text-[15px] font-semibold text-[#0F1222] transition-colors [@media(hover:hover)]:hover:text-[#E0457A] sm:inline">
-          Criar conta grátis
-        </a>
-        <a
-          href="/comecar"
+        <button
+          type="button"
+          onClick={onOpenWizard}
           className="inline-flex items-center rounded-full bg-[#0F1222] px-3.5 py-2 text-[13px] font-semibold text-white sm:hidden"
         >
-          Teste grátis
-        </a>
+          Demonstração
+        </button>
         <button
           type="button"
           onClick={onOpenWizard}

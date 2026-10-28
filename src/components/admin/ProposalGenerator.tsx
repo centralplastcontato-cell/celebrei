@@ -18,7 +18,9 @@
    companyName: string;
    email: string;
    phone: string;
-   plan: "starter" | "pro" | "enterprise";
+   plan: "ia";
+   buffets: number;
+   pricePerBuffet: number;
    paymentType: "monthly" | "annual";
    customFeatures: string[];
    notes: string;
@@ -26,53 +28,32 @@
    discount: number;
  }
  
- const planDetails = {
-   starter: {
-     name: "Starter",
-     price: 197,
-     features: [
-       "1 unidade",
-       "2 usuários",
-       "500 leads/mês",
-       "WhatsApp integrado",
-       "CRM básico",
-       "Landing page padrão",
-       "Suporte por email",
-     ],
-   },
-   pro: {
-     name: "Pro",
-     price: 497,
-     features: [
-       "3 unidades",
-       "5 usuários",
-       "Leads ilimitados",
-       "WhatsApp + Bot de qualificação",
-       "CRM completo com Kanban",
-       "Landing pages customizadas",
-       "Relatórios avançados",
-       "Suporte prioritário",
-       "Treinamento incluso",
-     ],
-   },
-   enterprise: {
-     name: "Enterprise",
-     price: 997,
-     features: [
-       "Unidades ilimitadas",
-       "Usuários ilimitados",
-       "White-label (sua marca)",
-       "API de integração",
-       "Suporte dedicado",
-       "SLA garantido",
-       "Treinamento personalizado",
-       "Customizações sob demanda",
-       "Gerente de conta exclusivo",
-     ],
-   },
- };
- 
- const additionalFeatures = [
+ // Plano único com IA (out/2026): o plano só com chatbot não é mais vendido.
+// Tabela R$ 1.299 por buffet; na negociação, o mínimo fica por volta de R$ 999.
+const PLAN_LIST_PRICE = 1299;
+const PLAN_MIN_PRICE = 999;
+
+const planDetails = {
+  ia: {
+    name: "Celebrei com IA",
+    price: PLAN_LIST_PRICE,
+    features: [
+      "Atendente com IA no WhatsApp, 24 horas",
+      "Até 500 conversas com a IA por mês, por buffet",
+      "Passa valores, consulta a agenda e marca visitas",
+      "Lembretes automáticos para quem parou de responder",
+      "CRM completo com funil de vendas",
+      "Agenda de visitas e festas",
+      "Contratos com assinatura digital e financeiro",
+      "Formulários, cardápio e avaliação pós-festa",
+      "Campanhas com mensagens e artes feitas pela IA",
+      "Implantação e treinamento por vídeo chamada",
+      "Suporte incluso",
+    ],
+  },
+};
+
+const additionalFeatures = [
    { id: "training", label: "Treinamento presencial", price: 500 },
    { id: "migration", label: "Migração de dados", price: 300 },
    { id: "customization", label: "Customização visual", price: 400 },
@@ -86,7 +67,9 @@
      companyName: "",
      email: "",
      phone: "",
-     plan: "pro",
+     plan: "ia",
+     buffets: 1,
+     pricePerBuffet: PLAN_LIST_PRICE,
      paymentType: "monthly",
      customFeatures: [],
      notes: "",
@@ -98,7 +81,7 @@
    const [isSaving, setIsSaving] = useState(false);
  
    const calculateTotal = () => {
-     const planPrice = planDetails[formData.plan].price;
+     const planPrice = formData.pricePerBuffet * Math.max(1, formData.buffets);
      const additionalTotal = formData.customFeatures.reduce((sum, featureId) => {
        const feature = additionalFeatures.find(f => f.id === featureId);
        return sum + (feature?.price || 0);
@@ -297,7 +280,7 @@
        yPos += 10;
        const paymentLabel = formData.paymentType === "annual" ? "Anual (10x)" : "Mensal";
        const pricingData = [
-         [`Plano ${plan.name} (${paymentLabel})`, `R$ ${formData.paymentType === "annual" ? (totals.planPrice * 10).toFixed(2) : totals.planPrice.toFixed(2)}`],
+         [`Plano ${plan.name} — ${formData.buffets} buffet${formData.buffets > 1 ? "s" : ""} × R$ ${formData.pricePerBuffet.toFixed(2)} (${paymentLabel})`, `R$ ${formData.paymentType === "annual" ? (totals.planPrice * 10).toFixed(2) : totals.planPrice.toFixed(2)}`],
        ];
        
        if (totals.additionalTotal > 0) {
@@ -364,10 +347,10 @@
        const terms = [
          "• Proposta válida pelo período indicado acima",
          "• Pagamento via PIX, boleto ou cartão de crédito",
-         "• Planos mensais podem ser cancelados a qualquer momento",
-         "• Planos anuais possuem desconto de 2 mensalidades",
-         "• Suporte técnico incluso em todos os planos",
-         "• Treinamento de implantação incluso nos planos Pro e Enterprise",
+         "• Plano mensal pode ser cancelado a qualquer momento",
+         "• Plano anual tem desconto de 2 mensalidades",
+         "• Suporte técnico, implantação e treinamento inclusos",
+         "• Até 500 conversas com a IA por mês, por buffet (referência de uso)",
        ];
        
        terms.forEach(term => {
@@ -476,23 +459,31 @@
              </div>
  
              <div className="grid sm:grid-cols-2 gap-4">
-               <div className="space-y-2">
-                 <Label>Plano</Label>
-                 <Select
-                   value={formData.plan}
-                   onValueChange={(value: "starter" | "pro" | "enterprise") => 
-                     setFormData(prev => ({ ...prev, plan: value }))
-                   }
-                 >
-                   <SelectTrigger>
-                     <SelectValue />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="starter">Starter - R$ 197/mês</SelectItem>
-                     <SelectItem value="pro">Pro - R$ 497/mês</SelectItem>
-                     <SelectItem value="enterprise">Enterprise - R$ 997/mês</SelectItem>
-                   </SelectContent>
-                 </Select>
+               <div className="grid grid-cols-2 gap-3">
+                 <div className="space-y-2">
+                   <Label htmlFor="buffets">Buffets</Label>
+                   <Input
+                     id="buffets"
+                     type="number"
+                     min={1}
+                     max={20}
+                     value={formData.buffets}
+                     onChange={(e) => setFormData(prev => ({ ...prev, buffets: Math.max(1, parseInt(e.target.value) || 1) }))}
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="pricePerBuffet">Valor por buffet (R$)</Label>
+                   <Input
+                     id="pricePerBuffet"
+                     type="number"
+                     min={0}
+                     value={formData.pricePerBuffet}
+                     onChange={(e) => setFormData(prev => ({ ...prev, pricePerBuffet: parseFloat(e.target.value) || 0 }))}
+                   />
+                   <p className={`text-[11px] ${formData.pricePerBuffet < PLAN_MIN_PRICE ? "text-destructive" : "text-muted-foreground"}`}>
+                     Tabela R$ {PLAN_LIST_PRICE} · mínimo ~R$ {PLAN_MIN_PRICE}
+                   </p>
+                 </div>
                </div>
                <div className="space-y-2">
                  <Label>Tipo de Pagamento</Label>
@@ -595,7 +586,7 @@
                  <div className="flex justify-between items-center mb-2">
                    <span className="font-bold text-lg">{planDetails[formData.plan].name}</span>
                    <span className="font-bold text-primary">
-                     R$ {planDetails[formData.plan].price}/mês
+                     R$ {(formData.pricePerBuffet * formData.buffets).toFixed(2)}/mês{formData.buffets > 1 ? ` (${formData.buffets} buffets)` : ""}
                    </span>
                  </div>
                  <ul className="text-sm text-muted-foreground space-y-1">

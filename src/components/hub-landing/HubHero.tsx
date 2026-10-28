@@ -45,8 +45,8 @@ export default function HubHero({ onOpenWizard, video }: HubHeroProps) {
             </h1>
 
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-slate-600 sm:text-xl lg:mx-0">
-              Enquanto a concorrência demora horas, seus leads recebem os pacotes do seu buffet e um convite para
-              visitar o espaço em segundos. Automático, 24 horas por dia, no seu WhatsApp.
+              Enquanto a concorrência demora horas, a atendente com IA da Celebrei responde seus leads em segundos:
+              tira dúvidas, passa os pacotes e valores do seu buffet e marca a visita. 24 horas por dia, no seu WhatsApp.
             </p>
 
             <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:justify-start">
@@ -54,8 +54,8 @@ export default function HubHero({ onOpenWizard, video }: HubHeroProps) {
                 Agendar demonstração gratuita
                 <ArrowRight className="h-5 w-5" />
               </button>
-              <a href="/comecar" className={BTN_SECONDARY}>
-                Criar conta grátis
+              <a href="#plano" className={BTN_SECONDARY}>
+                Ver o plano
               </a>
             </div>
 

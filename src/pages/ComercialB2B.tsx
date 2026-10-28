@@ -46,7 +46,7 @@ const ComercialB2B = () => {
  ✅ Central de WhatsApp unificada
  ✅ CRM visual com Kanban
  ✅ Landing pages de campanha prontas
- ✅ Bot de qualificação automática
+ ✅ Atendente com IA no WhatsApp, 24 horas: passa valores, consulta a agenda e marca visita
  ✅ Notificações em tempo real
  ✅ Relatórios e métricas
  
@@ -166,7 +166,7 @@ const ComercialB2B = () => {
                        {[
                          { icon: "🎪", title: "Landing Pages de Campanha", desc: "Páginas profissionais prontas em minutos. Troque a promoção, os textos e pronto — nova campanha no ar." },
                          { icon: "💬", title: "Central de WhatsApp", desc: "Todas as conversas em um só lugar. Sua equipe responde do computador, com histórico completo." },
-                         { icon: "🤖", title: "Bot de Qualificação", desc: "Captura nome, unidade, mês e número de convidados automaticamente — lead já chega qualificado." },
+                         { icon: "🤖", title: "Atendente com IA", desc: "Conversa como uma pessoa, 24 horas: tira dúvidas, passa valores, consulta a agenda e marca a visita — e chama de volta quem parou de responder." },
                          { icon: "📊", title: "CRM Kanban", desc: "Visualize cada lead em colunas: Novo → Em Contato → Orçamento → Fechado. Arraste e solte." },
                          { icon: "👥", title: "Multi-usuário", desc: "Admin, comercial, visualização. Cada um vê só o que precisa." },
                          { icon: "🔔", title: "Notificações em Tempo Real", desc: "Novo lead? Você é avisado na hora. Nunca mais perca oportunidade." },
@@ -221,7 +221,7 @@ const ComercialB2B = () => {
                      { icon: BarChart3, title: "CRM Visual", desc: "Kanban drag-and-drop para gestão de leads com status personalizados", badge: "Core" },
                      { icon: Zap, title: "Landing Pages", desc: "Páginas de campanha profissionais com gatilhos de urgência", badge: "Core" },
                      { icon: Users, title: "Multi-usuário", desc: "Controle de acesso por função: admin, comercial, visualização", badge: "Core" },
-                     { icon: Shield, title: "Bot de Qualificação", desc: "Coleta dados automaticamente: nome, unidade, mês, convidados", badge: "Automação" },
+                     { icon: Shield, title: "Atendente com IA", desc: "Atende 24h no WhatsApp: dúvidas, valores, datas livres e agendamento de visita", badge: "IA" },
                      { icon: Smartphone, title: "100% Responsivo", desc: "Funciona perfeitamente em desktop, tablet e celular", badge: "UX" },
                      { icon: Clock, title: "Tempo Real", desc: "Notificações instantâneas de novos leads e mensagens", badge: "Core" },
                      { icon: TrendingUp, title: "Métricas", desc: "Dashboard com KPIs: leads, conversões, tempo de resposta", badge: "Analytics" },
@@ -278,136 +278,71 @@ const ComercialB2B = () => {
                    <CardHeader>
                      <CardTitle>💰 Modelo de Precificação Sugerido</CardTitle>
                      <CardDescription>
-                       Valores sugestivos para comercialização da plataforma
+                       Plano único com IA — o plano só com chatbot não é mais vendido
                      </CardDescription>
                    </CardHeader>
                    <CardContent>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Starter */}
-                        <Card className="border-2">
-                          <CardHeader className="text-center pb-2">
-                            <Badge variant="outline" className="w-fit mx-auto mb-2">Starter</Badge>
-                            <CardTitle className="text-3xl">R$ 299</CardTitle>
-                            <CardDescription>/mês</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            {[
-                              "1 unidade",
-                              "2 usuários",
-                              "200 leads/mês",
-                              "WhatsApp integrado",
-                              "CRM completo",
-                              "Landing page padrão",
-                              "URL e domínio Celebrei",
-                              "Treinamento por vídeo chamada",
-                            ].map((item, index) => (
-                              <div key={index} className="flex items-center gap-2 text-sm">
-                                <CheckCircle2 className="h-4 w-4 text-accent" />
-                                <span>{item}</span>
-                              </div>
-                            ))}
-                          </CardContent>
-                        </Card>
+                    {/* Plano único com IA (out/2026): o plano só com chatbot não é mais vendido */}
+                    <div className="grid lg:grid-cols-2 gap-6">
+                      <Card className="border-2 border-primary relative">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <Badge className="bg-primary">Plano único</Badge>
+                        </div>
+                        <CardHeader className="text-center pb-2 pt-6">
+                          <Badge variant="outline" className="w-fit mx-auto mb-2">Celebrei com IA</Badge>
+                          <CardTitle className="text-3xl">R$ 1.299</CardTitle>
+                          <CardDescription>/mês por buffet (valor de tabela)</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {[
+                            "Atendente com IA no WhatsApp, 24 horas",
+                            "Até 500 conversas com a IA por mês",
+                            "Passa valores, consulta a agenda e marca visita",
+                            "Lembretes automáticos para quem parou de responder",
+                            "CRM completo com funil de vendas",
+                            "Agenda de visitas e festas",
+                            "Contratos com assinatura digital e financeiro",
+                            "Formulários, cardápio e avaliação pós-festa",
+                            "Campanhas com mensagens e artes feitas pela IA",
+                            "Implantação e treinamento por vídeo chamada",
+                          ].map((item, index) => (
+                            <div key={index} className="flex items-center gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                          <p className="text-xs text-muted-foreground pt-2">
+                            No site aparece "a partir de R$ 999/mês". As 500 conversas são referência de uso, não bloqueio:
+                            se o buffet passar disso todo mês, converse sobre reajuste.
+                          </p>
+                        </CardContent>
+                      </Card>
 
-                        {/* Pro */}
-                        <Card className="border-2 border-primary relative">
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <Badge className="bg-primary">Mais Popular</Badge>
+                      <Card className="border-2">
+                        <CardHeader>
+                          <CardTitle className="text-xl">🤝 Como negociar</CardTitle>
+                          <CardDescription>Tabela de R$ 1.299; o mínimo é por volta de R$ 999</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                          <p>Dê o desconto sempre com um motivo, para a tabela continuar valendo para os próximos clientes:</p>
+                          {[
+                            "Contrato de 12 meses",
+                            "Mais de um buffet (ex.: 2 buffets por R$ 1.999 no total)",
+                            "Condição de lançamento para os primeiros clientes",
+                            "Buffet pequeno (poucos leads por mês): pode chegar ao mínimo",
+                          ].map((item, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <CheckCircle2 className="h-4 w-4 text-accent" />
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                          <div className="bg-muted p-3 rounded-lg text-xs text-muted-foreground">
+                            <strong className="text-foreground">Custo da IA para a Celebrei:</strong> por volta de R$ 0,30 a R$ 0,60 por
+                            conversa — até 500 conversas, no máximo uns R$ 300 por buffet/mês. Mesmo no valor mínimo sobra margem.
                           </div>
-                          <CardHeader className="text-center pb-2">
-                            <Badge variant="outline" className="w-fit mx-auto mb-2">Pró</Badge>
-                            <CardTitle className="text-3xl">R$ 549</CardTitle>
-                            <CardDescription>/mês</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            {[
-                              "1 unidade",
-                              "5 usuários",
-                              "500 leads/mês",
-                              "WhatsApp integrado + Bot",
-                              "CRM completo",
-                              "Landing page customizada",
-                              "URL e domínio próprio*",
-                              "Treinamento por vídeo chamada",
-                            ].map((item, index) => (
-                              <div key={index} className="flex items-center gap-2 text-sm">
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                                <span>{item}</span>
-                              </div>
-                            ))}
-                            <p className="text-xs text-muted-foreground pt-2">
-                              *Custos adicionais de domínio
-                            </p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Premium */}
-                        <Card className="border-2 border-secondary relative bg-gradient-to-b from-secondary/5 to-transparent shadow-lg">
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <Badge className="bg-secondary text-secondary-foreground">
-                              <span className="mr-1">⭐</span> Melhor Custo-Benefício
-                            </Badge>
-                          </div>
-                          <CardHeader className="text-center pb-2 pt-6">
-                            <Badge variant="outline" className="w-fit mx-auto mb-2 border-secondary text-secondary">Premium</Badge>
-                            <CardTitle className="text-3xl text-secondary">R$ 899</CardTitle>
-                            <CardDescription>/mês</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            {[
-                              "2 unidades",
-                              "10 usuários",
-                              "Leads ilimitados",
-                              "WhatsApp integrado + Bot",
-                              "CRM completo",
-                              "1 Landing page customizada/mês",
-                              "URL e domínio próprio*",
-                              "Relatórios avançados",
-                              "Treinamento por vídeo chamada",
-                              "Suporte prioritário",
-                            ].map((item, index) => (
-                              <div key={index} className="flex items-center gap-2 text-sm">
-                                <CheckCircle2 className="h-4 w-4 text-secondary" />
-                                <span>{item}</span>
-                              </div>
-                            ))}
-                            <p className="text-xs text-muted-foreground pt-2">
-                              *Custos adicionais de domínio
-                            </p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Enterprise */}
-                        <Card className="border-2">
-                          <CardHeader className="text-center pb-2">
-                            <Badge variant="outline" className="w-fit mx-auto mb-2">Enterprise</Badge>
-                            <CardTitle className="text-2xl">Sob Consulta</CardTitle>
-                            <CardDescription>personalizado</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-3">
-                            {[
-                              "5 unidades",
-                              "20 usuários",
-                              "Leads ilimitados",
-                              "WhatsApp integrado + Bot",
-                              "CRM completo",
-                              "1 Landing page customizada/mês",
-                              "URL e domínio próprio*",
-                              "Relatórios avançados",
-                              "Treinamento por vídeo chamada",
-                              "Suporte prioritário",
-                            ].map((item, index) => (
-                              <div key={index} className="flex items-center gap-2 text-sm">
-                                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                                <span>{item}</span>
-                              </div>
-                            ))}
-                            <p className="text-xs text-muted-foreground pt-2">
-                              *Custos adicionais de domínio
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </div>
+                        </CardContent>
+                      </Card>
+                    </div>
                    </CardContent>
                  </Card>
  
@@ -425,11 +360,11 @@ const ComercialB2B = () => {
                          <strong className="text-foreground">Problema:</strong> Perdem ~20% dos leads por falta de follow-up = R$ 6.000 perdidos
                        </p>
                        <p className="text-sm text-muted-foreground">
-                         <strong className="text-foreground">Com a plataforma:</strong> Recuperam metade = +R$ 3.000/mês
+                         <strong className="text-foreground">Com a IA:</strong> atende na hora, 24h, e chama de volta quem sumiu — recuperar metade = +R$ 3.000/mês
                        </p>
                        <div className="pt-2 border-t border-border">
                          <p className="font-bold text-foreground">
-                           ROI: Investimento de R$ 497 → Retorno de R$ 3.000 = <span className="text-accent">6x de retorno</span>
+                           ROI: Investimento de R$ 1.299 → Retorno de R$ 3.000 = <span className="text-accent">mais de 2x de retorno</span> — uma festa a mais por mês já paga a plataforma
                          </p>
                        </div>
                      </div>

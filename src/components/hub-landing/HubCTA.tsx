@@ -60,12 +60,6 @@ export default function HubCTA({ onOpenWizard }: HubCTAProps) {
             Agendar uma conversa
             <ArrowRight className="h-5 w-5" />
           </button>
-          <a
-            href="/comecar"
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border-2 border-white/80 px-8 py-3.5 text-base font-semibold text-white transition-all [@media(hover:hover)]:hover:bg-white/10 sm:ml-3 sm:mt-9 sm:w-auto sm:text-lg"
-          >
-            Criar conta grátis
-          </a>
           <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             {["Sem compromisso", "Setup em 48h", "Suporte dedicado"].map((item) => (
               <li key={item} className="flex items-center gap-1.5 text-sm font-medium text-white/90">
