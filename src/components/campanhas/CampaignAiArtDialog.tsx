@@ -31,10 +31,12 @@ interface Props {
   defaultIdea: string;
   defaultText: string;
   onUse: (url: string) => void;
+  /** cada arte criada vai para a galeria da campanha (nenhuma se perde) */
+  onCreated?: (url: string) => void;
   onManual: () => void;
 }
 
-export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName, logoUrl, defaultIdea, defaultText, onUse, onManual }: Props) {
+export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName, logoUrl, defaultIdea, defaultText, onUse, onCreated, onManual }: Props) {
   const [idea, setIdea] = useState(defaultIdea);
   const [artText, setArtText] = useState(defaultText);
   const [useLogo, setUseLogo] = useState(!!logoUrl);
@@ -103,6 +105,7 @@ export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName
       setVersions((v) => [...v, data.url]);
       setCurrent(versions.length);
       setAdjust("");
+      onCreated?.(data.url);
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : "Não consegui criar a arte");
     } finally {
@@ -126,6 +129,9 @@ export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName
             <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
             <p className="text-sm font-medium">A IA está desenhando sua arte... {elapsed}s</p>
             <p className="text-xs text-muted-foreground">Leva por volta de 1 minuto. Não feche esta janela.</p>
+            {versions.length > 0 && (
+              <p className="text-xs text-muted-foreground">As artes que você já criou continuam salvas.</p>
+            )}
           </div>
         )}
 
@@ -133,12 +139,26 @@ export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName
           <div className="space-y-3">
             <img src={shown} alt="Arte criada" className="w-full rounded-xl border shadow-sm" />
             {versions.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {versions.map((v, i) => (
-                  <button key={v} type="button" onClick={() => setCurrent(i)} className={`shrink-0 rounded-md border-2 ${i === current ? "border-primary" : "border-transparent opacity-70"}`}>
-                    <img src={v} alt={`Versão ${i + 1}`} className="h-14 w-14 rounded object-cover" />
-                  </button>
-                ))}
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold">Suas artes ({versions.length}) — toque para escolher</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {versions.map((v, i) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setCurrent(i)}
+                      className={`relative aspect-square overflow-hidden rounded-lg border-2 transition ${i === current ? "border-primary ring-2 ring-primary/30" : "border-border opacity-80 hover:opacity-100"}`}
+                    >
+                      <img src={v} alt={`Arte ${i + 1}`} className="h-full w-full object-cover" />
+                      <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 text-[10px] font-semibold text-white">{i + 1}</span>
+                      {i === current && (
+                        <span className="absolute bottom-1 right-1 rounded-full bg-primary p-0.5 text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <div className="space-y-1.5">
@@ -157,12 +177,15 @@ export function CampaignAiArtDialog({ open, onOpenChange, companyId, companyName
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <Button className="flex-1 gap-1.5" onClick={() => { onUse(shown); onOpenChange(false); }}>
-                <Check className="w-4 h-4" /> Usar esta arte
+                <Check className="w-4 h-4" /> Usar {versions.length > 1 ? `a arte ${current + 1}` : "esta arte"}
               </Button>
-              <Button variant="ghost" className="flex-1 gap-1.5" onClick={() => run("new")}>
-                <Sparkles className="w-4 h-4" /> Criar outra
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => run("new")}>
+                <Sparkles className="w-4 h-4" /> Criar outra opção
               </Button>
             </div>
+            <p className="text-center text-[11px] text-muted-foreground">
+              Criar outra ou ajustar não apaga nada: todas ficam aqui e na galeria de imagens das campanhas.
+            </p>
           </div>
         )}
 
