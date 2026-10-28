@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, RefreshCw, Pencil, ImagePlus, ZoomIn, Trash2, Building2, Image, Wand2, Type, Palette, PenLine, X } from "lucide-react";
+import { Loader2, Sparkles, RefreshCw, Pencil, ImagePlus, ZoomIn, Trash2, Building2, Image, Wand2, Type, Palette, PenLine, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CampaignTextOverlayEditor } from "./CampaignTextOverlayEditor";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -94,6 +94,8 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
   const [generating, setGenerating] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [viewIndex, setViewIndex] = useState(0);
+  const [showGoal, setShowGoal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [composeElapsed, setComposeElapsed] = useState(0);
@@ -149,7 +151,8 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
       // As mensagens escritas à mão continuam; só as da IA são trocadas
       setDraft((prev) => ({ ...prev, variations: mergeGenerated(prev.variations, data.variations || []) }));
       setEditingIndex(null);
-      toast.success("5 variações geradas pela IA!");
+      setViewIndex(0);
+      toast.success("5 mensagens escritas pela IA!");
     } catch (err: any) {
       console.error("campaign-ai error:", err);
       toast.error(err.message || "Erro ao gerar variações");
@@ -341,6 +344,7 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
   const addManualVariation = () => {
     setDraft((prev) => ({ ...prev, variations: [...prev.variations, { tone: MANUAL_TONE, text: "" }] }));
     setEditingIndex(draft.variations.length);
+    setViewIndex(draft.variations.length);
     setEditText("");
   };
 
@@ -355,8 +359,19 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
     else setEditingIndex(null);
   };
 
+  const aiCount = draft.variations.filter((v) => v.tone !== MANUAL_TONE).length;
+  const total = draft.variations.length;
+  const current = Math.min(viewIndex, Math.max(total - 1, 0));
+  const shown = draft.variations[current];
+  const previewText = (text: string) =>
+    text.replace(/\{nome\}/gi, "Maria").replace(/\{empresa\}/gi, companyName || "seu buffet");
+
+  // Tela em 3 passos: o que avisar → mensagens (prévia como no WhatsApp,
+  // uma por vez) → imagem. Antes: o pedido técnico para a IA aparecia
+  // aberto, as mensagens ficavam numa caixa com rolagem dentro da rolagem e
+  // havia dois botões "Regenerar".
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Título da campanha */}
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -370,160 +385,191 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
         />
       </div>
 
-      {preset && (
-        <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
-          <span>{preset.emoji}</span>
-          <span className="min-w-0">
-            Campanha pronta: <strong>{preset.title}</strong>{draft.presetMonth ? ` (${draft.presetMonth})` : ""}. O objetivo abaixo já está escrito, pode ajustar.
-          </span>
-        </div>
-      )}
-
-      {/* Tipo da campanha */}
-      {!preset && (
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Tipo da campanha
-        </Label>
-        <Select
-          value={draft.campaignType}
-          onValueChange={(value) => {
-            const allItems = CAMPAIGN_TYPE_OPTIONS.flatMap((g) => g.items);
-            const match = allItems.find((item) => item.value === value);
-            setDraft((prev) => ({
-              ...prev,
-              campaignType: value,
-              description: match?.description || prev.description,
-            }));
-          }}
-        >
-          <SelectTrigger className="h-10">
-            <SelectValue placeholder="Selecione o tipo..." />
-          </SelectTrigger>
-          <SelectContent>
-            {CAMPAIGN_TYPE_OPTIONS.map((group) => (
-              <SelectGroup key={group.group}>
-                <SelectLabel>{group.group}</SelectLabel>
-                {group.items.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.value}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      )}
-
-      {/* Objetivo */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Descreva o objetivo da campanha
-        </Label>
-        <Textarea
-          placeholder="Ex: Promover festas de abril com 10% de desconto para quem fechar até sexta..."
-          value={draft.description}
-          onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
-          rows={preset ? 5 : 3}
-          className="resize-none"
-        />
-      </div>
-
-      {/* Botão gerar IA */}
-      <Button
-        onClick={handleGenerate}
-        disabled={generating || !draft.description.trim()}
-        className="w-full h-10 gap-2"
-        variant={draft.variations.length > 0 ? "outline" : "default"}
-      >
-        {generating ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+      {/* 1. O que avisar */}
+      <section className="space-y-2.5">
+        <StepTitle n={1} title={preset ? "O que a campanha vai avisar" : "O que você quer avisar"} />
+        {preset ? (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+            <p className="text-sm">
+              <span className="mr-1.5">{preset.emoji}</span>
+              <strong>{preset.title}</strong>{draft.presetMonth ? ` — ${draft.presetMonth}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground leading-snug">{preset.subtitle} A IA já sabe o que escrever.</p>
+            <button
+              type="button"
+              onClick={() => setShowGoal((v) => !v)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {showGoal ? "Esconder o pedido para a IA" : "Ver ou ajustar o pedido para a IA"}
+            </button>
+            {showGoal && (
+              <Textarea
+                value={draft.description}
+                onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+                rows={6}
+                className="resize-none bg-background text-sm"
+              />
+            )}
+          </div>
         ) : (
-          <Sparkles className="w-4 h-4" />
+          <>
+            <Select
+              value={draft.campaignType}
+              onValueChange={(value) => {
+                const allItems = CAMPAIGN_TYPE_OPTIONS.flatMap((g) => g.items);
+                const match = allItems.find((item) => item.value === value);
+                setDraft((prev) => ({
+                  ...prev,
+                  campaignType: value,
+                  description: match?.description || prev.description,
+                }));
+              }}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Escolha um tipo (opcional)..." />
+              </SelectTrigger>
+              <SelectContent>
+                {CAMPAIGN_TYPE_OPTIONS.map((group) => (
+                  <SelectGroup key={group.group}>
+                    <SelectLabel>{group.group}</SelectLabel>
+                    {group.items.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.value}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              placeholder="Ex: Avisar que ainda temos sábados livres em abril e convidar para conhecer o espaço..."
+              value={draft.description}
+              onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+              rows={3}
+              className="resize-none"
+            />
+          </>
         )}
-        {draft.variations.some((v) => v.tone !== MANUAL_TONE) ? "Regenerar Variações" : "Gerar 5 Variações com IA"}
-      </Button>
-      <Button
-        onClick={addManualVariation}
-        disabled={editingIndex !== null && !draft.variations[editingIndex]?.text.trim()}
-        variant="ghost"
-        className="w-full h-9 gap-2 -mt-3 text-muted-foreground"
-      >
-        <PenLine className="w-4 h-4" />
-        Escrever minha própria mensagem
-      </Button>
+      </section>
 
-      {/* Variações */}
-      {draft.variations.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Variações
-              </span>
-              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                {draft.variations.length}
-              </Badge>
-            </div>
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={handleGenerate} disabled={generating}>
-              <RefreshCw className={`w-3 h-3 mr-1 ${generating ? "animate-spin" : ""}`} />
-              Regenerar
+      {/* 2. Mensagens */}
+      <section className="space-y-2.5">
+        <StepTitle n={2} title="Mensagens" hint={total > 0 ? `Cada cliente recebe uma destas ${total}, em rodízio.` : undefined} />
+
+        {total === 0 && generating && (
+          <div className="rounded-xl border border-dashed p-6 text-center space-y-2">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-muted-foreground">A IA está escrevendo 5 mensagens...</p>
+          </div>
+        )}
+
+        {total === 0 && !generating && (
+          <div className="rounded-xl border border-dashed p-4 space-y-2">
+            <Button onClick={handleGenerate} disabled={!draft.description.trim()} className="w-full h-10 gap-2">
+              <Sparkles className="w-4 h-4" /> Escrever 5 mensagens com a IA
+            </Button>
+            <Button onClick={addManualVariation} variant="ghost" className="w-full h-9 gap-2 text-muted-foreground">
+              <PenLine className="w-4 h-4" /> Prefiro escrever a minha
             </Button>
           </div>
-          <div className="max-h-80 overflow-y-auto rounded-xl border bg-muted/20">
-            <div className="p-2.5 space-y-2">
-              {draft.variations.map((v, i) => (
-                <div key={i} className="p-3 rounded-lg border bg-background shadow-sm text-sm transition-all hover:shadow-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className="text-[10px] font-medium">
-                      {TONE_LABELS[v.tone] || v.tone}
-                    </Badge>
-                    <div className="flex items-center gap-0.5">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground" title="Editar" onClick={() => {
-                        setEditingIndex(i);
-                        setEditText(v.text);
-                      }}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive" title="Tirar esta mensagem" onClick={() => removeVariation(i)}>
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  {editingIndex === i ? (
-                    <div className="space-y-2">
-                      <Textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        rows={4}
-                        autoFocus
-                        placeholder="Oi {nome}! Aqui é da {empresa}..."
-                        className="text-sm resize-none"
-                      />
-                      <div className="flex gap-1.5 justify-end">
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => cancelEdit(i)}>Cancelar</Button>
-                        <Button size="sm" className="h-7 text-xs" onClick={() => saveEdit(i)}>Salvar</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{v.text}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <p className="text-[11px] text-muted-foreground px-1">
-            Use <strong>{"{nome}"}</strong> para o nome do cliente e <strong>{"{empresa}"}</strong> para o nome do buffet. Cada pessoa recebe uma das mensagens, em rodízio.
-          </p>
-        </div>
-      )}
+        )}
 
-      {/* Image section */}
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Imagem (opcional)
-        </Label>
+        {total > 0 && shown && (
+          <div className="rounded-xl border bg-muted/20 p-3 space-y-3">
+            {/* Navegação */}
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={current === 0 || editingIndex !== null} onClick={() => setViewIndex(current - 1)} aria-label="Mensagem anterior">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <div className="flex-1 text-center">
+                <p className="text-sm font-semibold">Mensagem {current + 1} de {total}</p>
+                <p className="text-[11px] text-muted-foreground">{TONE_LABELS[shown.tone] || shown.tone}</p>
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={current >= total - 1 || editingIndex !== null} onClick={() => setViewIndex(current + 1)} aria-label="Próxima mensagem">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {editingIndex === current ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  rows={7}
+                  autoFocus
+                  placeholder="Oi {nome}! Aqui é da {empresa}..."
+                  className="text-sm resize-none bg-background"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Use <strong>{"{nome}"}</strong> para o nome do cliente e <strong>{"{empresa}"}</strong> para o nome do buffet.
+                </p>
+                <div className="flex gap-1.5 justify-end">
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => cancelEdit(current)}>Cancelar</Button>
+                  <Button size="sm" className="h-8 text-xs" onClick={() => saveEdit(current)}>Salvar</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Prévia como chega no WhatsApp */}
+                <div className="rounded-lg bg-[#efeae2] dark:bg-zinc-900 p-3">
+                  <div className="ml-auto max-w-[92%] rounded-lg rounded-tr-none bg-[#d9fdd3] dark:bg-emerald-900/60 p-1.5 shadow-sm">
+                    {draft.imageUrl && (
+                      <img src={draft.imageUrl} alt="" className="mb-1.5 max-h-48 w-full rounded-md object-cover" />
+                    )}
+                    <p className="whitespace-pre-wrap px-1.5 pb-1 text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">{previewText(shown.text)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingIndex(current); setEditText(shown.text); }}>
+                    <Pencil className="w-3 h-3" /> Editar
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs hover:text-destructive" onClick={() => removeVariation(current)}>
+                    <X className="w-3.5 h-3.5" /> Não usar esta
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Bolinhas */}
+            {total > 1 && (
+              <div className="flex justify-center gap-1.5">
+                {draft.variations.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Ver mensagem ${i + 1}`}
+                    disabled={editingIndex !== null}
+                    onClick={() => setViewIndex(i)}
+                    className={`h-2 rounded-full transition-all ${i === current ? "w-5 bg-primary" : "w-2 bg-muted-foreground/30"}`}
+                  />
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-center text-muted-foreground">Prévia com o nome de exemplo "Maria".</p>
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleGenerate} disabled={generating || !draft.description.trim()} variant="outline" className="flex-1 h-9 gap-2 text-xs">
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {aiCount > 0 ? "Pedir outras para a IA" : "Escrever 5 com a IA"}
+            </Button>
+            <Button
+              onClick={addManualVariation}
+              disabled={editingIndex !== null}
+              variant="outline"
+              className="flex-1 h-9 gap-2 text-xs"
+            >
+              <PenLine className="w-3.5 h-3.5" /> Escrever uma minha
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/* 3. Imagem */}
+      <section className="space-y-2.5">
+        <StepTitle n={3} title="Imagem (opcional)" hint="Vai junto com a mensagem." />
         {draft.imageUrl ? (
           <div className="rounded-xl border border-border/60 bg-muted/10 shadow-sm overflow-hidden">
             {/* Preview row */}
@@ -859,6 +905,18 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
             initialLogoPosition={includeLogo && currentCompany?.logo_url ? logoPosition : null}
           />
         )}
+      </section>
+    </div>
+  );
+}
+
+function StepTitle({ n, title, hint }: { n: number; title: string; hint?: string }) {
+  return (
+    <div className="flex items-start gap-2">
+      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">{n}</span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold leading-tight">{title}</p>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       </div>
     </div>
   );

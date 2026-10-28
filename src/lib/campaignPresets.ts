@@ -207,7 +207,7 @@ export function presetGoal(id: CampaignPresetId, ctx: PresetContext = {}): strin
   switch (id) {
     case "datas_livres": {
       const dates = (ctx.freeDates || []).slice(0, 8).map((d) => freeDateLabel(d, ctx.partialDates)).join(", ");
-      return `Avisar quem tem interesse em festa em ${ctx.month} que ainda temos fins de semana livres na agenda${dates ? `: ${dates}` : ""}. As datas são poucas e quem garantir primeiro fica com elas (é verdade: são as que sobraram). Convidar para conhecer o espaço ou garantir a data. ${COMMON_RULES}`;
+      return `Avisar quem tem interesse em festa em ${ctx.month} que ainda temos fins de semana livres na agenda${dates ? `: ${dates}` : ""}.${dates.includes("só ") ? ' Quando a data diz "só almoço" ou "só noite", escreva isso junto da data na mensagem (o outro horário já está reservado).' : ""} As datas são poucas e quem garantir primeiro fica com elas (é verdade: são as que sobraram). Convidar para conhecer o espaço ou garantir a data. ${COMMON_RULES}`;
     }
     case "sumiu":
       return `Retomar a conversa com quem pediu orçamento de festa e parou de responder. Tom leve e sem cobrança, como quem lembra da pessoa: perguntar se ainda está pensando na festa e se ficou alguma dúvida, e oferecer ajuda (tirar dúvidas, mandar fotos do espaço ou marcar uma visita). ${COMMON_RULES}`;
