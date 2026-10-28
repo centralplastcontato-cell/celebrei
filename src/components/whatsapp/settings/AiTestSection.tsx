@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, GraduationCap, Sparkles } from "lucide-react";
 import { AiTestChat } from "@/components/setup/AiTestChat";
+import { AiOwnerNotes } from "@/components/setup/AiOwnerNotes";
 import { AiImagesEditor } from "@/components/setup/AiImagesEditor";
 import { HandoffAlertPhone } from "@/components/setup/HandoffAlertPhone";
 import { AiHandoffReasons } from "@/components/setup/AiHandoffReasons";
@@ -26,6 +27,7 @@ const IDEAS = [
 export function AiTestSection({ canManage = true }: { canManage?: boolean }) {
   const { currentCompany } = useCompany();
   const [open, setOpen] = useState(false);
+  const [taught, setTaught] = useState(0);
   if (!currentCompany) return null;
   return (
     <div className="max-w-xl space-y-4">
@@ -52,9 +54,19 @@ export function AiTestSection({ canManage = true }: { canManage?: boolean }) {
             ))}
           </ul>
           <Button onClick={() => setOpen(true)} className="w-full sm:w-auto"><Sparkles className="mr-2 h-4 w-4" /> Conversar com a minha IA</Button>
-          <p className="text-xs text-muted-foreground">Alguma resposta errada? Avise a equipe Celebrei que a gente ajusta.</p>
+          <p className="text-xs text-muted-foreground">
+            {canManage ? "Alguma resposta errada? Toque em \"Corrigir\" embaixo dela e ensine como deveria ser." : "Alguma resposta errada? Avise quem cuida do buffet."}
+          </p>
         </CardContent>
       </Card>
+      {canManage && (
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            <p className="flex items-center gap-2 font-medium"><GraduationCap className="h-4 w-4 text-primary" /> Ensinar a IA</p>
+            <AiOwnerNotes companyId={currentCompany.id} refreshKey={taught} />
+          </CardContent>
+        </Card>
+      )}
       {canManage && (<>
       <Card>
         <CardContent className="space-y-3 pt-6">
@@ -75,7 +87,7 @@ export function AiTestSection({ canManage = true }: { canManage?: boolean }) {
         </CardContent>
       </Card>
       </>)}
-      <AiTestChat open={open} onOpenChange={setOpen} companyId={currentCompany.id} />
+      <AiTestChat open={open} onOpenChange={setOpen} companyId={currentCompany.id} canTeach={canManage} onTaught={() => setTaught((n) => n + 1)} />
     </div>
   );
 }

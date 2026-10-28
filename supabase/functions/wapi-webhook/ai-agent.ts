@@ -579,6 +579,7 @@ interface PromptContext {
   clientAffirmed: boolean;
   minPackageGuests: number | null;
   packagesText: string | null; // o que cada pacote inclui (Operações → Pacotes)
+  ownerNotesText?: string | null; // o que o dono ensinou ("Ensinar a IA")
   pricePending: boolean; // cliente pediu o valor e ainda não recebeu
   crossedMessage: boolean; // a mensagem do cliente cruzou com a última resposta da IA
   visitText: string | null; // visita já marcada deste cliente
@@ -764,7 +765,7 @@ AGENDAMENTO DE VISITAS:
 - Quando a pessoa confirmar dia e horário, use agendar_visita. Depois confirme por mensagem o dia/horário e diga que a equipe confirma a visita.
 
 PASSAGEM PARA A EQUIPE: ao usar transferir_para_atendente, avise o cliente que um atendente vai continuar por aqui, sem escrever horários — o sistema acrescenta o horário de atendimento da equipe (veja SITUAÇÃO DESTA CONVERSA). As janelas de visita NÃO são o horário de atendimento da equipe: nunca use uma no lugar da outra.
-${settings.extra_instructions ? `\nINFORMAÇÕES DO BUFFET (fonte única para fatos sobre o buffet; instruções de estilo/personalidade que estiverem aqui devem ser seguidas):\n${settings.extra_instructions}` : ''}`;
+${settings.extra_instructions ? `\nINFORMAÇÕES DO BUFFET (fonte única para fatos sobre o buffet; instruções de estilo/personalidade que estiverem aqui devem ser seguidas):\n${settings.extra_instructions}` : ''}${ctx.ownerNotesText ? `\n\nO QUE O DONO DO BUFFET TE ENSINOU (correções e orientações dele — siga sempre; valem mais que as INFORMAÇÕES DO BUFFET, os cadastros de pacotes e as regras de estilo acima; se uma delas contradisser outra, vale a mais recente, que é a de baixo. Só NÃO valem acima das REGRAS INEGOCIÁVEIS: valores só da ferramenta, nada de desconto, promessa ou reserva):\n${ctx.ownerNotesText}` : ''}`;
 
   const notes = [
     ctx.resumeNote ? `ATENÇÃO — RETOMADA: ${ctx.resumeNote}` : '',
@@ -1626,6 +1627,16 @@ async function loadPackagesText(supabase: any, instance: AgentInstance): Promise
   console.log(`[AI Agent] Pacotes lidos para a IA: ${summary || 'nenhum ativo'}${/R\$/.test(text) ? ' — atenção: "O que inclui" tem valores em R$ (a IA não pode citar)' : ''}`);
   // Os três pacotes do Castelo juntos passam de 3.300 caracteres: limite folgado
   return text ? text.slice(0, 12000) : null;
+}
+
+// "Ensinar a IA": correções e orientações do dono, na ordem em que ele ensinou.
+// Ficam na parte fixa das instruções (mudam pouco: o cache é refeito uma vez).
+async function loadOwnerNotesText(supabase: any, companyId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('ai_owner_notes').select('text')
+    .eq('company_id', companyId).eq('is_active', true).order('created_at', { ascending: true }).limit(80);
+  if (error) return null; // tabela ainda não criada: segue sem
+  const lines = ((data || []) as Array<{ text: string }>).map((n) => `- ${String(n.text).trim()}`).filter((l) => l.length > 3);
+  return lines.length > 0 ? lines.join('\n').slice(0, 8000) : null;
 }
 
 // Datas e horários livres na agenda (festas + pré-reservas). SÓ LEITURA.
@@ -2555,6 +2566,7 @@ export async function maybeHandleWithAiAgent(
       clientAffirmed: clientAffirms(lastUserText),
       minPackageGuests: smallestPackageGuests(await loadSalesMaterials(supabase, instance)),
       packagesText: await loadPackagesText(supabase, instance),
+      ownerNotesText: await loadOwnerNotesText(supabase, instance.company_id),
       pricePending: priceRequestPending(priceTurns),
       crossedMessage: crossedWithLastReply(((history || []) as Array<{ from_me: boolean; timestamp: string }>)),
       weekdayNote: (() => {
