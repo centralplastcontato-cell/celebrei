@@ -61,5 +61,6 @@ describe("datas livres por horário (igual à IA)", () => {
   it("objetivo da campanha leva o horário quando só parte do dia está livre", () => {
     const goal = presetGoal("datas_livres", { month: "Novembro", freeDates: ["2026-11-14"], partialDates: { "2026-11-14": "noite" } });
     expect(goal).toContain("14/11 (sáb, só noite)");
+    expect(goal).toContain('escreva isso junto da data');
   });
 });
