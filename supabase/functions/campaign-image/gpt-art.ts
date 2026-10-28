@@ -61,7 +61,7 @@ async function fetchImage(url: string, name: string): Promise<File> {
   return new File([await res.arrayBuffer()], `${name}.${ext}`, { type });
 }
 
-/** Gera (ou ajusta) a arte. Devolve o PNG em base64 e o modelo usado. */
+/** Gera (ou ajusta) a arte. Devolve o JPEG em base64 e o modelo usado. */
 export async function generateArt(opts: {
   apiKey: string;
   prompt: string;
@@ -78,6 +78,11 @@ export async function generateArt(opts: {
       form.append("prompt", opts.prompt);
       form.append("size", "1024x1024");
       form.append("quality", "medium");
+      // JPEG: o PNG da OpenAI vem com um bloco de "credenciais" logo no
+      // começo do arquivo e não abria no iPhone (28/10). JPEG também é bem
+      // mais leve para o WhatsApp.
+      form.append("output_format", "jpeg");
+      form.append("output_compression", "90");
       if (cfg.fidelity) form.append("input_fidelity", "high");
       for (const f of files) form.append("image[]", f);
       res = await fetch("https://api.openai.com/v1/images/edits", {
@@ -89,7 +94,7 @@ export async function generateArt(opts: {
       res = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: cfg.model, prompt: opts.prompt, size: "1024x1024", quality: "medium", n: 1 }),
+        body: JSON.stringify({ model: cfg.model, prompt: opts.prompt, size: "1024x1024", quality: "medium", n: 1, output_format: "jpeg", output_compression: 90 }),
       });
     }
     if (res.ok) {
