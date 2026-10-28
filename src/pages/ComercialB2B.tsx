@@ -312,7 +312,7 @@ const ComercialB2B = () => {
                             </div>
                           ))}
                           <p className="text-xs text-muted-foreground pt-2">
-                            No site aparece "a partir de R$ 999/mês". As 500 conversas são referência de uso, não bloqueio:
+                            No site aparece "a partir de R$ 1.299/mês" (a tabela); o desconto entra na negociação. As 500 conversas são referência de uso, não bloqueio:
                             se o buffet passar disso todo mês, converse sobre reajuste.
                           </p>
                         </CardContent>

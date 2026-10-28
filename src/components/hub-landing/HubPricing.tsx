@@ -43,7 +43,7 @@ export default function HubPricing({ onOpenWizard }: { onOpenWizard: () => void 
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#D23468]">Celebrei com IA</p>
           <p className="mt-3 text-slate-600">a partir de</p>
           <p className="font-grotesque text-5xl font-extrabold tracking-[-0.03em] text-[#0F1222]">
-            R$ 999<span className="text-xl font-semibold text-slate-500">/mês</span>
+            R$ 1.299<span className="text-xl font-semibold text-slate-500">/mês</span>
           </p>
           <p className="mt-1 text-sm text-slate-500">por buffet · até 500 conversas com a IA por mês</p>
 
