@@ -153,8 +153,8 @@ export function CampaignWizard({ open, onOpenChange, companyId, companyName, onC
     setPicking(true);
   };
 
-  const pickPreset = ({ preset, month, freeDates }: PresetPick) => {
-    const ctx = { month, freeDates };
+  const pickPreset = ({ preset, month, freeDates, partialDates }: PresetPick) => {
+    const ctx = { month, freeDates, partialDates };
     setDraft({
       ...EMPTY_DRAFT,
       name: presetName(preset.id, ctx),

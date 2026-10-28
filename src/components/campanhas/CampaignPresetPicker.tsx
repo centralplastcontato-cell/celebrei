@@ -8,22 +8,36 @@ import { fetchAllPages } from "@/lib/fetchAllPages";
 import {
   CAMPAIGN_PRESETS,
   type CampaignPreset,
-  freeWeekendDates,
-  shortDateBR,
+  freeDateLabel,
+  freeWeekendSlots,
   upcomingMonths,
 } from "@/lib/campaignPresets";
+import { parseClosedPeriods } from "@/lib/partyDate";
+import {
+  type AgendaEvent,
+  type AgendaPreReservation,
+  freePartySlots,
+  parsePartySlots,
+} from "../../../supabase/functions/_shared/party-availability.ts";
 
 export interface PresetPick {
   preset: CampaignPreset;
   month?: string;
   freeDates?: string[];
+  partialDates?: Record<string, string>;
 }
 
 interface MonthAgenda {
   name: string;
   freeDates: string[];
+  partialDates: Record<string, string>;
 }
 
+const slotName = (start: string) => (Number(start.split(":")[0]) < 16 ? "almoço" : "noite");
+
+// Mesma conta da IA (freeSlotsBetween): almoço e noite separados, pré-reservas
+// ativas, recesso e cada unidade física. Antes, qualquer festa no dia tirava o
+// sábado inteiro da lista — mesmo com a noite livre.
 function useFreeWeekends(companyId: string): MonthAgenda[] | null {
   const [agenda, setAgenda] = useState<MonthAgenda[] | null>(null);
   useEffect(() => {
@@ -34,16 +48,40 @@ function useFreeWeekends(companyId: string): MonthAgenda[] | null {
     const first = `${months[0].year}-${String(months[0].monthIndex + 1).padStart(2, "0")}-01`;
     const lastM = months[months.length - 1];
     const last = new Date(Date.UTC(lastM.year, lastM.monthIndex + 1, 0)).toISOString().slice(0, 10);
-    fetchAllPages<{ event_date: string }>((a, b) =>
-      supabase.from("company_events").select("event_date").eq("company_id", companyId)
-        .gte("event_date", first).lte("event_date", last).neq("status", "cancelado").order("id").range(a, b),
-    )
-      .catch(() => [])
-      .then((rows) => {
+    const db = supabase as any;
+    Promise.all([
+      db.from("ai_agent_settings").select("party_slots, closed_periods").eq("company_id", companyId).maybeSingle(),
+      db.from("company_units").select("name").eq("company_id", companyId).eq("is_active", true).eq("is_physical", true),
+      fetchAllPages<AgendaEvent>((a, b) =>
+        db.from("company_events").select("event_date, start_time, end_time, status, unit").eq("company_id", companyId)
+          .gte("event_date", first).lte("event_date", last).order("id").range(a, b),
+      ),
+      db.from("pre_reservations").select("event_date, unit").eq("company_id", companyId).eq("status", "ativa")
+        .gt("reservation_expires_at", new Date().toISOString()).gte("event_date", first).lte("event_date", last),
+    ])
+      .then(([settings, units, events, pre]) => {
         if (!alive) return;
-        const booked = new Set(rows.map((r) => String(r.event_date).slice(0, 10)));
-        setAgenda(months.map((m) => ({ name: m.name, freeDates: freeWeekendDates(m.year, m.monthIndex, booked, today) })));
-      });
+        const slots = parsePartySlots(settings.data?.party_slots);
+        const closed = parseClosedPeriods(settings.data?.closed_periods);
+        const unitNames = ((units.data || []) as Array<{ name: string }>).map((u) => u.name).filter(Boolean);
+        const unitList = unitNames.length > 1 ? unitNames : [unitNames[0] || null];
+        const free = new Map<string, string[]>();
+        for (const unit of unitList) {
+          for (const f of freePartySlots({
+            from: first, to: last, slots, events, unit, physicalUnits: unitNames,
+            preReservations: (pre.data || []) as AgendaPreReservation[],
+          })) {
+            if (closed.some((c) => f.date >= c.start && f.date <= c.end)) continue;
+            free.set(f.date, [...(free.get(f.date) || []), slotName(f.slot.start)]);
+          }
+        }
+        const slotCount = new Set(slots.map((s) => slotName(s.start))).size;
+        setAgenda(months.map((m) => {
+          const r = freeWeekendSlots(m.year, m.monthIndex, free, slotCount, today);
+          return { name: m.name, freeDates: r.dates, partialDates: r.partial };
+        }));
+      })
+      .catch(() => { if (alive) setAgenda(months.map((m) => ({ name: m.name, freeDates: [], partialDates: {} }))); });
     return () => { alive = false; };
   }, [companyId]);
   return agenda;
@@ -83,14 +121,14 @@ export function CampaignPresetPicker({ companyId, onPick, onBlank }: {
                         key={m.name}
                         type="button"
                         disabled={n === 0}
-                        onClick={() => onPick({ preset: p, month: m.name, freeDates: m.freeDates })}
+                        onClick={() => onPick({ preset: p, month: m.name, freeDates: m.freeDates, partialDates: m.partialDates })}
                         className="text-left rounded-xl border border-border px-3 py-2 hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-transparent"
                       >
                         <p className="text-sm font-semibold">{m.name}</p>
                         <p className="text-[11px] text-muted-foreground leading-snug">
                           {n === 0
                             ? "Fins de semana já reservados"
-                            : `${n} ${n === 1 ? "dia livre" : "dias livres"} no fim de semana: ${m.freeDates.slice(0, 3).map(shortDateBR).join(", ")}${n > 3 ? "..." : ""}`}
+                            : `${n} ${n === 1 ? "dia livre" : "dias livres"} no fim de semana: ${m.freeDates.slice(0, 3).map((d) => freeDateLabel(d, m.partialDates)).join(", ")}${n > 3 ? "..." : ""}`}
                         </p>
                       </button>
                     );
