@@ -674,9 +674,9 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
           defaultText={draft.name}
           onUse={(url) => {
             setDraft((prev) => ({ ...prev, imageUrl: url }));
-            saveImageToGallery(url, "ai_gpt");
             toast.success("Arte aplicada! 🎨");
           }}
+          onCreated={(url) => saveImageToGallery(url, "ai_gpt")}
           onManual={handleOpenArtDialog}
         />
 
