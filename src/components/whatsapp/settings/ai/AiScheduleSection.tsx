@@ -20,6 +20,7 @@ const ALERT_MINUTE_OPTIONS = [5, 10, 15, 20, 30];
 interface Draft {
   introName: string;
   introImage: string | null;
+  visitByTeam: boolean;
   visitDays: number[]; visitStart: string; visitEnd: string; visitHalfHour: boolean;
   visitSatDifferent: boolean; visitSatStart: string; visitSatEnd: string;
   teamDays: number[]; teamStart: string; teamEnd: string;
@@ -39,6 +40,7 @@ function draftFrom(s: AiAgentSettings): Draft {
   return {
     introName: s.assistant_name || "",
     introImage: s.intro_image_url || null,
+    visitByTeam: s.visit_scheduling === "equipe",
     visitDays: v.days, visitStart: v.start, visitEnd: v.end, visitHalfHour: v.halfHour,
     visitSatDifferent: v.satDifferent, visitSatStart: v.satStart, visitSatEnd: v.satEnd,
     teamDays: t.days, teamStart: t.start, teamEnd: t.end,
@@ -76,11 +78,11 @@ export function AiScheduleSection() {
   const setFn = <K extends keyof Draft>(key: K) => (fn: (prev: Draft[K]) => Draft[K]) => setD((prev) => (prev ? { ...prev, [key]: fn(prev[key]) } : prev));
 
   const save = async () => {
-    if (d.visitDays.length === 0) {
+    if (!d.visitByTeam && d.visitDays.length === 0) {
       toast({ title: "Escolha os dias de visita", description: "Marque pelo menos um dia da semana.", variant: "destructive" });
       return;
     }
-    if (d.visitEnd <= d.visitStart || (d.visitSatDifferent && d.visitDays.includes(5) && d.visitSatEnd <= d.visitSatStart)) {
+    if (!d.visitByTeam && (d.visitEnd <= d.visitStart || (d.visitSatDifferent && d.visitDays.includes(5) && d.visitSatEnd <= d.visitSatStart))) {
       toast({ title: "Horário de visita inválido", description: "O horário final precisa ser depois do inicial.", variant: "destructive" });
       return;
     }
@@ -112,6 +114,7 @@ export function AiScheduleSection() {
       ...(settings.corporate_events_enabled !== undefined
         ? { corporate_events_enabled: d.corporateOn, corporate_max_guests: max > 0 ? max : null }
         : {}),
+      ...(settings.visit_scheduling !== undefined ? { visit_scheduling: d.visitByTeam ? "equipe" as const : "ia" as const } : {}),
     });
     if (ok) {
       const fresh = draftFrom(ok);
@@ -146,7 +149,24 @@ export function AiScheduleSection() {
         />
       </AiCard>
 
-      <AiCard icon={<CalendarDays className="h-4 w-4 text-violet-600" />} title="Visitas ao espaço" description="Dias e horários que a IA pode oferecer para o cliente conhecer o buffet.">
+      <AiCard icon={<CalendarDays className="h-4 w-4 text-violet-600" />} title="Visitas ao espaço" description="Quem marca as visitas e, se for a IA, os dias e horários que ela pode oferecer.">
+        {settings.visit_scheduling !== undefined && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold">Quem marca as visitas</Label>
+            <Select value={d.visitByTeam ? "equipe" : "ia"} onValueChange={(v) => set("visitByTeam")(v === "equipe")}>
+              <SelectTrigger className="h-10 bg-card border-border shadow-sm" aria-label="Quem marca as visitas"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ia">A IA marca (oferece os horários abaixo)</SelectItem>
+                <SelectItem value="equipe">A equipe marca (a IA passa o cliente para vocês)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {d.visitByTeam ? (
+          <p className="text-xs text-violet-700 bg-violet-500/10 rounded-lg px-3 py-2 dark:text-violet-300">
+            A IA não oferece dia nem horário de visita. Quando o cliente quiser conhecer o espaço, ela avisa que a equipe vai combinar e passa a conversa para vocês.
+          </p>
+        ) : (<>
         <WeekHoursEditor
           days={d.visitDays} setDays={setFn("visitDays")}
           start={d.visitStart} setStart={set("visitStart")}
@@ -171,6 +191,7 @@ export function AiScheduleSection() {
             A IA vai oferecer: <span className="font-bold">{serializeVisitHours(d.visitDays, d.visitStart, d.visitEnd, d.visitHalfHour, d.visitSatDifferent, d.visitSatStart, d.visitSatEnd)}</span>
           </p>
         )}
+        </>)}
       </AiCard>
 
       <AiCard icon={<Clock className="h-4 w-4 text-sky-600" />} title="Horário da equipe no WhatsApp" description="Quando a IA passa a conversa, ela avisa o cliente se a equipe responde agora ou no próximo horário.">

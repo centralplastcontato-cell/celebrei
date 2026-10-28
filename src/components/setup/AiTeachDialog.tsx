@@ -53,6 +53,7 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [packageHint, setPackageHint] = useState(false);
+  const [visitHint, setVisitHint] = useState(false);
   const [busy, setBusy] = useState<"" | "audio" | "organizar" | "salvar">("");
   const [recording, setRecording] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -64,6 +65,7 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
     setNotes(null);
     setBlocked(null);
     setPackageHint(false);
+    setVisitHint(false);
   }, [open, context]);
 
   const startRecording = async () => {
@@ -104,12 +106,13 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
     if (text.trim().length < 3) return;
     setBusy("organizar");
     try {
-      const p = await invokeTeach<{ notes: Note[]; blocked: string | null; packageHint: boolean }>({
+      const p = await invokeTeach<{ notes: Note[]; blocked: string | null; packageHint: boolean; visitHint?: boolean }>({
         action: "propose", company_id: companyId, text, cliente: context?.cliente || null, resposta: context?.resposta || null,
       });
       setNotes(p.notes);
       setBlocked(p.blocked);
       setPackageHint(p.packageHint);
+      setVisitHint(p.visitHint === true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não consegui organizar");
     } finally {
@@ -178,6 +181,11 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
             {blocked && (
               <p className="flex gap-2 rounded-lg bg-amber-500/15 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="h-4 w-4 shrink-0" /> {blocked}
+              </p>
+            )}
+            {visitHint && (
+              <p className="rounded-lg bg-primary/10 p-2.5 text-xs">
+                Para a IA não marcar visitas, use a opção certa: <strong>Configurações → Inteligência Artificial → Apresentação e horários → Quem marca as visitas → A equipe marca</strong>. Ela funciona sempre, sem precisar ensinar.
               </p>
             )}
             {notes.length > 0 ? (
