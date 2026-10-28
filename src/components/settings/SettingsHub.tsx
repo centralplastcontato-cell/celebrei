@@ -122,7 +122,7 @@ export function SettingsHub({ userId, userEmail, isAdmin, isGestor, canManageUse
         { id: "ia-buffet", title: "Sobre o buffet", description: "Estrutura, diferenciais, respostas rápidas e regras", icon: Store, visible: aiOn, render: () => <AiBuffetInfoSection /> },
         { id: "ia-followup", title: "Acompanhamento", description: "Lembretes para quem parou de responder", icon: MessageCircleHeart, visible: aiOn, render: () => <AiFollowUpSection /> },
         { id: "materials", title: "Materiais", description: "Fotos, vídeo, PDF e avaliações que a IA envia", icon: FolderOpen, visible: messagesOn, render: () => <SalesMaterialsSection userId={userId} isAdmin={isAdmin} /> },
-        { id: "ia-teste", title: "Testar e ensinar", description: "Conversar com a IA e ver o que ela passou para a equipe", icon: Sparkles, visible: companyAdmin && hasAi, render: () => <AiTestSection /> },
+        { id: "ia-teste", title: companyAdmin ? "Testar e ensinar" : "Testar a IA", description: companyAdmin ? "Conversar com a IA e ver o que ela passou para a equipe" : "Conversar com a IA como se fosse um cliente", icon: Sparkles, visible: hasAi, render: () => <AiTestSection canManage={companyAdmin} /> },
         { id: "ia-tecnico", title: "Técnico (Celebrei)", description: "Modelo, consumo, número de teste e testes automáticos", icon: Cpu, visible: aiOn && isAdmin, render: () => <AiTechSection /> },
       ],
     },

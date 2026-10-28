@@ -2218,6 +2218,9 @@ export async function maybeHandleWithAiAgent(
     }
 
     settings = await loadSettings(supabase, instance.company_id);
+    // No teste isolado, buffet que ainda não escolheu o número da IA testa com o
+    // número do próprio buffet (Mega Magic 28/10: a IA ficava calada no teste)
+    if (settings && !settings.unit && inSandbox()) settings = { ...settings, unit: instance.unit };
     // O simulador testa mesmo com a IA ainda desligada para os clientes
     if (!settings || (!settings.enabled && !inSandbox()) || !settings.unit) {
       console.log(`[AI Agent] IA desligada ou sem unidade configurada para a empresa ${instance.company_id} — pulando`);
