@@ -37,6 +37,8 @@ export interface PresetContext {
   month?: string;
   /** fins de semana ainda livres no mês escolhido (AAAA-MM-DD) */
   freeDates?: string[];
+  /** data com só parte do dia livre → o horário livre ("noite") */
+  partialDates?: Record<string, string>;
   /** leads com festa feita há ~1 ano (só "Festa do ano que vem") */
   pastPartyLeadIds?: Set<string>;
   /** telefones (finais) que conversaram nos últimos SUMIU_MIN_DAYS dias */
@@ -121,6 +123,43 @@ export function shortDateBR(ymd: string): string {
   return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")} (${wd === 6 ? "sáb" : wd === 0 ? "dom" : ["", "seg", "ter", "qua", "qui", "sex"][wd]})`;
 }
 
+/** "21/11 (sáb)" ou, com só um horário livre, "21/11 (sáb, só noite)" */
+export function freeDateLabel(ymd: string, partial?: Record<string, string>): string {
+  const base = shortDateBR(ymd);
+  const only = partial?.[ymd];
+  return only ? base.replace(/\)$/, `, só ${only})`) : base;
+}
+
+/**
+ * Sábados e domingos do mês (a partir de amanhã) com ALGUM horário de festa
+ * livre — mesma conta da IA (almoço e noite separados). Antes, qualquer festa
+ * no dia tirava o dia inteiro: sábado com almoço reservado e noite livre sumia.
+ * `freeSlots`: data → horários livres ("almoço", "noite"); `slotCount`: quantos
+ * horários de festa o buffet tem por dia.
+ */
+export function freeWeekendSlots(
+  year: number,
+  monthIndex: number,
+  freeSlots: Map<string, string[]>,
+  slotCount: number,
+  todayYmd: string,
+): { dates: string[]; partial: Record<string, string> } {
+  const dates: string[] = [];
+  const partial: Record<string, string> = {};
+  const days = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  for (let d = 1; d <= days; d++) {
+    const date = new Date(Date.UTC(year, monthIndex, d));
+    const wd = date.getUTCDay();
+    if (wd !== 0 && wd !== 6) continue;
+    const ymd = date.toISOString().slice(0, 10);
+    const free = [...new Set(freeSlots.get(ymd) || [])];
+    if (ymd <= todayYmd || free.length === 0) continue;
+    dates.push(ymd);
+    if (free.length < slotCount) partial[ymd] = free.join(" e ");
+  }
+  return { dates, partial };
+}
+
 /** Sábados e domingos do mês (a partir de amanhã) sem nenhuma festa marcada */
 export function freeWeekendDates(year: number, monthIndex: number, bookedDates: Set<string>, todayYmd: string): string[] {
   const out: string[] = [];
@@ -167,7 +206,7 @@ export function presetName(id: CampaignPresetId, ctx: PresetContext = {}): strin
 export function presetGoal(id: CampaignPresetId, ctx: PresetContext = {}): string {
   switch (id) {
     case "datas_livres": {
-      const dates = (ctx.freeDates || []).slice(0, 8).map(shortDateBR).join(", ");
+      const dates = (ctx.freeDates || []).slice(0, 8).map((d) => freeDateLabel(d, ctx.partialDates)).join(", ");
       return `Avisar quem tem interesse em festa em ${ctx.month} que ainda temos fins de semana livres na agenda${dates ? `: ${dates}` : ""}. As datas são poucas e quem garantir primeiro fica com elas (é verdade: são as que sobraram). Convidar para conhecer o espaço ou garantir a data. ${COMMON_RULES}`;
     }
     case "sumiu":

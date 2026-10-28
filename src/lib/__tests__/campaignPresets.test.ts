@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { freeWeekendDates, presetGoal, presetMatches, shortDateBR, upcomingMonths } from "../campaignPresets";
+import { freeDateLabel, freeWeekendDates, freeWeekendSlots, presetGoal, presetMatches, shortDateBR, upcomingMonths } from "../campaignPresets";
 
 const now = Date.parse("2026-10-24T12:00:00Z");
 const daysAgo = (n: number) => new Date(now - n * 86400000).toISOString();
@@ -40,5 +40,26 @@ describe("campanhas prontas", () => {
     expect(upcomingMonths("2026-10-24").map((m) => m.name)).toEqual(["Novembro", "Dezembro", "Janeiro"]);
     expect(upcomingMonths("2026-10-05").map((m) => m.name)).toEqual(["Outubro", "Novembro", "Dezembro"]);
     expect(upcomingMonths("2026-12-28")[0]).toEqual({ year: 2027, monthIndex: 0, name: "Janeiro" });
+  });
+});
+
+describe("datas livres por horário (igual à IA)", () => {
+  it("sábado com o almoço reservado e a noite livre continua na lista, marcado", () => {
+    const free = new Map<string, string[]>([
+      ["2026-11-07", ["almoço", "noite"]],
+      ["2026-11-14", ["noite"]],
+      ["2026-11-08", []],
+      ["2026-11-10", ["almoço", "noite"]], // terça: não entra
+    ]);
+    const r = freeWeekendSlots(2026, 10, free, 2, "2026-10-27");
+    expect(r.dates).toEqual(["2026-11-07", "2026-11-14"]);
+    expect(r.partial).toEqual({ "2026-11-14": "noite" });
+    expect(freeDateLabel("2026-11-14", r.partial)).toBe("14/11 (sáb, só noite)");
+    expect(freeDateLabel("2026-11-07", r.partial)).toBe("07/11 (sáb)");
+  });
+
+  it("objetivo da campanha leva o horário quando só parte do dia está livre", () => {
+    const goal = presetGoal("datas_livres", { month: "Novembro", freeDates: ["2026-11-14"], partialDates: { "2026-11-14": "noite" } });
+    expect(goal).toContain("14/11 (sáb, só noite)");
   });
 });
