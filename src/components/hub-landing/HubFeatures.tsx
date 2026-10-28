@@ -24,9 +24,8 @@ const MORE = [
   "IA que aponta quem vai fechar",
   "Campanhas e reativação de leads",
   "Painel da festa no celular",
-  "Landing page do buffet com chatbot",
+  "Landing page do buffet",
   "Várias unidades num só painel",
-  "Editor visual de fluxos do bot",
   "Confirmação automática de visita",
   "Pré-reservas com prazo",
   "Checklist de cada festa",
@@ -74,8 +73,8 @@ export default function HubFeatures() {
         >
           <Card
             icon={Bot}
-            title="WhatsApp com atendimento automático"
-            description="Responde na hora, faz as perguntas certas, envia fotos e pacotes do buffet e agenda a visita."
+            title="Atendente com IA no WhatsApp"
+            description="Conversa como gente, 24 horas: tira dúvidas, passa valores, envia fotos e pacotes do buffet e agenda a visita."
           >
             <FlowVisual />
           </Card>

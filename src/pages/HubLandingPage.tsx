@@ -7,6 +7,7 @@ import HubBeforeAfter from "@/components/hub-landing/HubBeforeAfter";
 import HubHowItWorks from "@/components/hub-landing/HubHowItWorks";
 import HubFeatures from "@/components/hub-landing/HubFeatures";
 import HubCTA from "@/components/hub-landing/HubCTA";
+import HubPricing from "@/components/hub-landing/HubPricing";
 import HubFooter from "@/components/hub-landing/HubFooter";
 import HubProspectWizard from "@/components/hub-landing/HubProspectWizard";
 
@@ -23,7 +24,7 @@ export default function HubLandingPage() {
     <div className="hub-lp min-h-screen bg-white pb-20 font-inter text-[#0F1222] antialiased sm:pb-0">
       <Helmet>
         <title>Celebrei | A melhor plataforma para buffets infantis</title>
-        <meta name="description" content="Transforme leads em festas fechadas com CRM + WhatsApp automatizado. Plataforma completa para buffets infantis." />
+        <meta name="description" content="Transforme leads em festas fechadas com uma atendente de IA no WhatsApp + CRM. Plataforma completa para buffets infantis, a partir de R$ 999/mês." />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap"
@@ -37,6 +38,7 @@ export default function HubLandingPage() {
       <HubBeforeAfter />
       <HubHowItWorks />
       <HubFeatures />
+      <HubPricing onOpenWizard={() => setIsWizardOpen(true)} />
       <HubCTA onOpenWizard={() => setIsWizardOpen(true)} />
       <HubFooter />
       <MobileStickyCTA onClick={() => setIsWizardOpen(true)} />
@@ -59,12 +61,6 @@ function MobileStickyCTA({ onClick }: { onClick: () => void }) {
       className={`fixed inset-x-0 bottom-0 z-40 border-t border-[#0F1222]/[0.06] bg-white/95 p-3 backdrop-blur transition-transform duration-300 sm:hidden ${visible ? "translate-y-0" : "translate-y-full"}`}
     >
       <div className="flex gap-2">
-        <a
-          href="/comecar"
-          className="flex flex-1 items-center justify-center rounded-full border-2 border-[#0F1222] py-3 text-[15px] font-semibold text-[#0F1222]"
-        >
-          Criar conta grátis
-        </a>
         <button
           type="button"
           onClick={onClick}
