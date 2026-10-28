@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, RefreshCw, Pencil, ImagePlus, ZoomIn, Trash2, Building2, Image, Wand2, Type, Palette, PenLine, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CampaignTextOverlayEditor } from "./CampaignTextOverlayEditor";
+import { CampaignAiArtDialog } from "./CampaignAiArtDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -102,6 +103,7 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
   const [includeLogo, setIncludeLogo] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [artDialogOpen, setArtDialogOpen] = useState(false);
+  const [aiArtOpen, setAiArtOpen] = useState(false);
   const [buffetPhotos, setBuffetPhotos] = useState<string[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [logoPosition, setLogoPosition] = useState<string>("bottom-right");
@@ -602,7 +604,7 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
               <button
                 type="button"
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                onClick={handleOpenArtDialog}
+                onClick={() => setAiArtOpen(true)}
               >
                 <Wand2 className="w-3 h-3" />
                 Criar Arte
@@ -620,10 +622,10 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
             <Button
               type="button"
               className="w-full h-12 gap-2.5 text-sm font-semibold"
-              onClick={handleOpenArtDialog}
+              onClick={() => setAiArtOpen(true)}
             >
               <Wand2 className="w-4.5 h-4.5" />
-              Criar Arte Profissional
+              Criar arte com IA
             </Button>
 
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -662,7 +664,23 @@ export function CampaignContextStep({ draft, setDraft, companyName }: Props) {
           </DialogContent>
         </Dialog>
 
-        {/* Dialog de Criar Arte Profissional */}
+        <CampaignAiArtDialog
+          open={aiArtOpen}
+          onOpenChange={setAiArtOpen}
+          companyId={currentCompanyId || ""}
+          companyName={companyName}
+          logoUrl={currentCompany?.logo_url}
+          defaultIdea={draft.name ? `Arte alegre de festa infantil para a campanha "${draft.name}"` : ""}
+          defaultText={draft.name}
+          onUse={(url) => {
+            setDraft((prev) => ({ ...prev, imageUrl: url }));
+            saveImageToGallery(url, "ai_gpt");
+            toast.success("Arte aplicada! 🎨");
+          }}
+          onManual={handleOpenArtDialog}
+        />
+
+        {/* Dialog de Criar Arte Profissional (montar à mão em cima de uma foto) */}
         <Dialog open={artDialogOpen} onOpenChange={setArtDialogOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>

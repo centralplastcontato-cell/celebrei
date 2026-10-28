@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkCompanyAccess } from "../_shared/company-access.ts";
+import { buildArtPrompt, generateArt } from "./gpt-art.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { base_image_url, logo_url, company_id, position, campaign_theme, context, generation_mode } = await req.json();
+    const body = await req.json();
+    const { base_image_url, logo_url, company_id, position, campaign_theme, context, generation_mode } = body;
 
     // Só quem está logado com acesso à empresa (antes qualquer um gerava arte paga)
     const access = await checkCompanyAccess(
@@ -29,6 +31,42 @@ Deno.serve(async (req) => {
     }
 
     const isThemeOnly = generation_mode === "theme_only";
+    const isGpt = generation_mode === "gpt";
+    let imageUrl: string | null = null;
+    let usedModel = "dall-e-3";
+    let costUsd = 0.08;
+
+    if (isGpt) {
+      const idea = String(body.idea || "").trim();
+      const adjust = String(body.adjust || "").trim();
+      const previousUrl = body.previous_url ? String(body.previous_url) : null;
+      if (!idea && !adjust) {
+        return new Response(
+          JSON.stringify({ error: "Descreva a arte que você quer" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const apiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+      const isAdjust = !!(adjust && previousUrl);
+      const photoUrl = !isAdjust && body.photo_url ? String(body.photo_url) : null;
+      const logo = logo_url ? String(logo_url) : null;
+      const prompt = buildArtPrompt({
+        idea,
+        artText: body.art_text,
+        companyName: body.company_name,
+        hasLogo: !!logo,
+        hasPhoto: !!photoUrl,
+        adjust: isAdjust ? adjust : null,
+      });
+      const refs = isAdjust ? [previousUrl!, ...(logo ? [logo] : [])] : [...(logo ? [logo] : []), ...(photoUrl ? [photoUrl] : [])];
+      const art = await generateArt({ apiKey, prompt, imageUrls: refs });
+      imageUrl = art.b64;
+      usedModel = art.model;
+      costUsd = 0.07;
+    }
+
+    if (!isGpt) {
 
     if (!isThemeOnly && !base_image_url) {
       return new Response(
@@ -111,7 +149,6 @@ ABSOLUTE RULE: Do NOT add ANY text, letters, words, numbers, banners with text, 
     // For photo-based mode with DALL-E, we can only generate (not edit inline with text prompt easily)
     // So we generate a new image inspired by the theme for both modes
     const MAX_RETRIES = 2;
-    let imageUrl: string | null = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -163,6 +200,8 @@ ABSOLUTE RULE: Do NOT add ANY text, letters, words, numbers, banners with text, 
         const delay = (attempt + 1) * 3000;
         await new Promise((r) => setTimeout(r, delay));
       }
+    }
+
     }
 
     if (!imageUrl) throw new Error("OpenAI falhou após tentativas de retry");
@@ -217,11 +256,11 @@ ABSOLUTE RULE: Do NOT add ANY text, letters, words, numbers, banners with text, 
     await supabase.from("ai_usage_logs").insert({
       company_id,
       function_name: "campaign-image",
-      model: "dall-e-3",
+      model: usedModel,
       prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
-      estimated_cost_usd: 0.08,
+      estimated_cost_usd: costUsd,
     });
 
     return new Response(
