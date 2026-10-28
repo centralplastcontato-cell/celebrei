@@ -3,7 +3,7 @@ import { buildTeachPrompt, buildTeachUserMessage, parseTeachProposal } from "./t
 
 Deno.test("ensinar: lê as notas, o bloqueio e o aviso de pacote (com texto em volta)", () => {
   const p = parseTeachProposal('Claro! {"notas":[{"texto":"A decoração NÃO está inclusa no Classic.","tipo":"informacao"},{"texto":"x","tipo":"orientacao"}],"bloqueado":null,"pacote":true}');
-  assertEquals(p, { notes: [{ text: "A decoração NÃO está inclusa no Classic.", kind: "informacao" }], blocked: null, packageHint: true });
+  assertEquals(p, { notes: [{ text: "A decoração NÃO está inclusa no Classic.", kind: "informacao" }], blocked: null, packageHint: true, visitHint: false });
 });
 
 Deno.test("ensinar: pedido de desconto vem bloqueado e sem notas", () => {
@@ -20,4 +20,9 @@ Deno.test("ensinar: o pedido leva o que já foi ensinado e a resposta corrigida"
   assertEquals(buildTeachPrompt("Mega Magic", ["Fale de você"]).includes("- Fale de você"), true);
   const u = buildTeachUserMessage("decoração não vem no classic", { cliente: "a decoração está inclusa?", resposta: "Está sim!" });
   assertEquals(u.includes('Resposta da IA que o dono quer corrigir: "Está sim!"'), true);
+});
+
+Deno.test("ensinar: pedido de não marcar visita traz o aviso da configuração", () => {
+  const p = parseTeachProposal('{"notas":[{"texto":"Não ofereça horários de visita.","tipo":"orientacao"}],"bloqueado":null,"pacote":false,"visita":true}');
+  assertEquals(p?.visitHint, true);
 });

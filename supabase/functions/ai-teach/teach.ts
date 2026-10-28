@@ -20,6 +20,8 @@ export interface TeachProposal {
   blocked: string | null;
   /** é fato de pacote: vale também acertar o cadastro do pacote */
   packageHint: boolean;
+  /** é sobre a IA não marcar visita: existe a opção "Quem marca as visitas" */
+  visitHint: boolean;
 }
 
 export function buildTeachPrompt(companyName: string, existing: string[]): string {
@@ -34,11 +36,12 @@ Escreva como regra para a IA (imperativo ou afirmação), sem citar o cliente do
 NÃO pode virar orientação (marque em "bloqueado", explicando em uma frase simples para o dono): mandar a IA inventar ou passar valores fora da tabela oficial, dar ou prometer desconto, brinde ou condição de pagamento, prometer coisas, reservar/segurar datas ou dizer que a data está garantida, ou fingir ser humana. Nesses casos, devolva sem as notas que pedem isso.
 
 Se a correção for sobre o que um pacote inclui, marque "pacote": true (o dono também deve acertar o cadastro do pacote).
+Se o dono quiser que a IA NÃO ofereça/marque horários de visita (quem marca é a equipe), marque "visita": true — existe uma configuração própria para isso.
 Não repita o que já está ensinado:
 ${existing.length ? existing.map((e) => `- ${e}`).join("\n") : "(nada ainda)"}
 
 Responda SÓ com JSON, sem texto em volta:
-{"notas":[{"texto":"...","tipo":"informacao"|"orientacao"}],"bloqueado":null|"motivo","pacote":true|false}`;
+{"notas":[{"texto":"...","tipo":"informacao"|"orientacao"}],"bloqueado":null|"motivo","pacote":true|false,"visita":true|false}`;
 }
 
 export function buildTeachUserMessage(text: string, ctx: TeachContext): string {
@@ -67,5 +70,5 @@ export function parseTeachProposal(raw: string): TeachProposal | null {
     .filter((n) => n.text.length >= 3)
     .slice(0, 4);
   const blocked = typeof obj.bloqueado === "string" && obj.bloqueado.trim() ? obj.bloqueado.trim().slice(0, 300) : null;
-  return { notes, blocked, packageHint: obj.pacote === true };
+  return { notes, blocked, packageHint: obj.pacote === true, visitHint: obj.visita === true };
 }

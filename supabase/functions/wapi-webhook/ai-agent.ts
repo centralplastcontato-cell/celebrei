@@ -80,6 +80,7 @@ interface AgentConv {
   __holdMaterials?: boolean;
   // 1ª resposta da IA: se os materiais forem liberados, vão DEPOIS da apresentação
   __firstReply?: boolean;
+  __teamVisits?: boolean; // visitas marcadas pela equipe (a IA não oferece horários)
   // Quer trabalhar: link do cadastro de candidatos que o sistema põe no fim da resposta
   __candidateLink?: string;
   // Data da festa pedida conferida na agenda neste turno (para a mensagem depois do PDF)
@@ -94,6 +95,9 @@ interface AiSettings {
   activated_at: string | null;
   extra_instructions: string | null;
   visit_hours: string;
+  // Quem marca as visitas: 'ia' (padrão — a IA oferece horários e agenda) ou
+  // 'equipe' (a IA não oferece horários: quem quer visitar vai para a equipe)
+  visit_scheduling?: string | null;
   model: string;
   // Modo de Teste da própria IA — separado do Modo de Teste do bot fixo
   // (wapi_bot_settings). Deixa testar só a IA, com um número específico,
@@ -596,6 +600,11 @@ interface PromptContext {
   corporateNote?: string | null; // contato é (ou parece ser) uma empresa — confraternização
 }
 
+// Visitas marcadas pela equipe (Configurar IA → "Quem marca as visitas")
+export function teamSchedulesVisits(settings: { visit_scheduling?: string | null }): boolean {
+  return settings.visit_scheduling === 'equipe';
+}
+
 // Convidar para a visita no máximo a cada 3–4 respostas, ou quando fizer sentido
 function visitInviteRule(repliesAgo: number | null, clientAffirmed = false): string {
   // "Ok" logo depois do convite: ele provavelmente aceitou — fecha o horário
@@ -629,11 +638,31 @@ function buildSystemPrompt(companyName: string, unit: string, settings: AiSettin
     ? ctx.offers.map(formatSlot).join(' ou ')
     : 'nenhum horário livre nos próximos dias — nesse caso transfira para a equipe';
   const assistantName = String(settings.assistant_name || '').trim();
+  const teamVisits = teamSchedulesVisits(settings);
+  const goal = teamVisits
+    ? 'SEU OBJETIVO PRINCIPAL: conduzir a conversa de forma simpática e natural até o cliente querer conhecer o espaço ou garantir a data — e aí passar para a equipe, que combina a visita com ele. Neste buffet QUEM MARCA AS VISITAS É A EQUIPE (veja VISITAS).'
+    : 'SEU OBJETIVO PRINCIPAL: conduzir a conversa de forma simpática e natural até AGENDAR UMA VISITA ao buffet. A visita é o passo que mais fecha festas.';
+  const visitRules = teamVisits
+    ? `VISITAS — QUEM MARCA É A EQUIPE (configuração do buffet; vale mais que qualquer outra regra sobre visita nestas instruções):
+- Você NUNCA oferece, sugere nem marca dia ou horário de visita, e não diz em que dias ou horários o buffet recebe visitas. Não existe ferramenta de agendar visita para você.
+- Pode convidar o cliente para conhecer o espaço quando fizer sentido (sem horários, sem repetir o convite em toda mensagem), dizendo que a equipe combina o melhor dia com ele.
+- Quando o cliente quiser visitar/conhecer o espaço, ou perguntar quando pode ir: diga com carinho que a equipe vai combinar a visita com ele e use transferir_para_atendente na mesma resposta (motivo: "cliente quer agendar visita"). Não pergunte dia ou horário de preferência.
+- Se o cliente já tiver visita marcada (SITUAÇÃO DESTA CONVERSA), só confirme com carinho; para trocar ou desmarcar, passe para a equipe.`
+    : `CONVITE PARA VISITA (não seja repetitiva): a regra desta resposta está em SITUAÇÃO DESTA CONVERSA.
+
+AGENDAMENTO DE VISITAS:
+- Janelas de visita: ${settings.visit_hours}.
+- Ao oferecer visita, ofereça JÁ NA MESMA MENSAGEM 2 horários concretos (os sugeridos em SITUAÇÃO DESTA CONVERSA). Nunca diga que vai passar horários sem passá-los.
+- O convite para visita TERMINA SEMPRE com uma pergunta direta para a pessoa escolher — nada de "se quiser, posso agendar…" solto. Ex.: "Tenho amanhã, sexta, às 11h ou sábado às 10h. Qual fica melhor pra você vir conhecer? 😍".
+- Horários de visita livres nos próximos dias: veja SITUAÇÃO DESTA CONVERSA. Se o cliente pedir outro dia ou horário de visita, ou quiser TROCAR a visita que já marcou, ofereça desta lista e use agendar_visita (remarcar=true se ele já tem visita) — NUNCA passe para a equipe por causa de visita.
+- Se o cliente pedir um dia/horário fora das janelas ou já ocupado, NÃO transfira: diga com gentileza que nesse horário não dá e ofereça os horários livres mais próximos (a ferramenta agendar_visita devolve quais são).
+- QUANDO O CLIENTE PODE: se, depois de um convite de visita, ele disser quando consegue ("só à noite", "eu trabalho durante o dia", "só no fim de semana"), isso é sobre a VISITA (não sobre o horário da festa). Ofereça na mesma resposta 2 horários da lista que encaixam, com dia e hora. Se nenhum encaixa (ex.: ele quer à noite e as visitas vão só até a tarde), diga com gentileza quais são as janelas de visita e ofereça a opção mais próxima do que ele pediu (ex.: sábado de manhã). Nunca ofereça horário de visita fora das janelas nem escreva só "à noite"/"de manhã" sem a hora, e termine com uma pergunta para ele escolher.
+- Quando a pessoa confirmar dia e horário, use agendar_visita. Depois confirme por mensagem o dia/horário e diga que a equipe confirma a visita.`;
   const stable = `Você é ${assistantName ? `a ${assistantName}, ` : ''}a assistente virtual de vendas do ${companyName} (buffet infantil), atendendo por um dos WhatsApps de atendimento ("${unit}" é só o nome interno deste número: nunca cite ao cliente nem chame de unidade). A data de hoje e o que já se sabe desta conversa estão em SITUAÇÃO DESTA CONVERSA, no fim destas instruções — leia sempre.${assistantName ? ` SEU NOME é ${assistantName} (definido nas configurações): use sempre este nome, mesmo que as informações do buffet ou mensagens antigas da conversa citem outro.` : ''}
 
 ${ctx.singleVenue ? `ESPAÇO ÚNICO: o ${companyName} tem UM único espaço (o endereço das informações do buffet). NÃO existe outra unidade ou filial. Se o cliente perguntar de outra unidade ("unidade 1", outro endereço, qual fica mais perto), responda com naturalidade que hoje o ${companyName} fica só nesse endereço e siga a conversa. Nunca diga "esta unidade", nunca dê a entender que existe outra e não passe para a equipe por isso.\n\n` : ''}MENSAGENS DA EQUIPE: no histórico, o que começa com "[Equipe]" foi escrito por uma pessoa da equipe, não por você. Respeite o que ela combinou (valores, condições, horários, visitas): não contradiga nem repita; se o cliente pedir algo além do que ela combinou, passe para a equipe. Nunca escreva "[Equipe]" nas suas respostas.
 
-SEU OBJETIVO PRINCIPAL: conduzir a conversa de forma simpática e natural até AGENDAR UMA VISITA ao buffet. A visita é o passo que mais fecha festas.
+${goal}
 
 COMO CONVERSAR:
 - Português brasileiro, tom caloroso, animado e humano, mensagens CURTAS (2 a 4 frases; a de valores pode ter um bloco curto por pacote).
@@ -745,7 +774,7 @@ ${ctx.packagesText
       `  🏠 *Estrutura:* [o que o cadastro diz]\n` +
       `  Qual desses combina mais com a festa? 😍"\n` +
       `Para COMPARAR pacotes, mostre só o que muda (o que um tem a mais que o outro), no mesmo formato, sem repetir o que é igual.\n` +
-      `PERGUNTA DO FIM (depois de explicar ou comparar pacotes): simples e que leve a conversa para frente — qual pacote combina mais com a festa, ou, se ainda não marcou visita, o convite com 2 horários. NUNCA ofereça mostrar "o que um pacote tem a menos" nem fique oferecendo mais comparações em sequência.\n\n`
+      `PERGUNTA DO FIM (depois de explicar ou comparar pacotes): simples e que leve a conversa para frente — qual pacote combina mais com a festa, ou, se ainda não marcou visita, ${teamVisits ? 'o convite para conhecer o espaço (a equipe combina o dia)' : 'o convite com 2 horários'}. NUNCA ofereça mostrar "o que um pacote tem a menos" nem fique oferecendo mais comparações em sequência.\n\n`
     : 'O QUE CADA PACOTE INCLUI: não cadastrado — se perguntarem a diferença entre os pacotes, envie o PDF de pacotes (enviar_materiais, tipo "pacotes") em vez de transferir.\n\n'}${ctx.minPackageGuests ? `PACOTES: o menor pacote é para ${ctx.minPackageGuests} convidados. Se o cliente falar em menos de ${ctx.minPackageGuests} convidados ou pedir orçamento para menos, explique JÁ NA MESMA RESPOSTA (não espere ele perguntar), com naturalidade, que o menor pacote é para ${ctx.minPackageGuests} pessoas e que a equipe explica como fica para um grupo menor. Se ele pediu o valor e já disse o dia, consulte o valor para ${ctx.minPackageGuests} convidados (consultar_valor_pacote) e passe na mesma resposta, deixando claro que é o valor do pacote mínimo.\n\n` : ''}COMO APRESENTAR O BUFFET (diferenciais, estrutura, atrações — ex.: na primeira resposta): nunca um parágrafo corrido com tudo emendado. Abra com "Só aqui você vai encontrar 🥳" e depois 3 a 4 linhas curtas (no máximo umas 7 palavras cada, para caber numa linha do celular), cada uma começando com um emoji, juntando o que combina (mesmo que as informações do buffet peçam "2 ou 3 linhas", use este formato). Só cite o que estiver nas INFORMAÇÕES DO BUFFET. Formato:
   "Só aqui você vai encontrar 🥳
   🏆 [tradição e número de festas]
@@ -753,19 +782,10 @@ ${ctx.packagesText
   🎢 [principais atrações]
   🚗 [comodidades, ex.: estacionamento]"
 
-CONVITE PARA VISITA (não seja repetitiva): a regra desta resposta está em SITUAÇÃO DESTA CONVERSA.
-
-AGENDAMENTO DE VISITAS:
-- Janelas de visita: ${settings.visit_hours}.
-- Ao oferecer visita, ofereça JÁ NA MESMA MENSAGEM 2 horários concretos (os sugeridos em SITUAÇÃO DESTA CONVERSA). Nunca diga que vai passar horários sem passá-los.
-- O convite para visita TERMINA SEMPRE com uma pergunta direta para a pessoa escolher — nada de "se quiser, posso agendar…" solto. Ex.: "Tenho amanhã, sexta, às 11h ou sábado às 10h. Qual fica melhor pra você vir conhecer? 😍".
-- Horários de visita livres nos próximos dias: veja SITUAÇÃO DESTA CONVERSA. Se o cliente pedir outro dia ou horário de visita, ou quiser TROCAR a visita que já marcou, ofereça desta lista e use agendar_visita (remarcar=true se ele já tem visita) — NUNCA passe para a equipe por causa de visita.
-- Se o cliente pedir um dia/horário fora das janelas ou já ocupado, NÃO transfira: diga com gentileza que nesse horário não dá e ofereça os horários livres mais próximos (a ferramenta agendar_visita devolve quais são).
-- QUANDO O CLIENTE PODE: se, depois de um convite de visita, ele disser quando consegue ("só à noite", "eu trabalho durante o dia", "só no fim de semana"), isso é sobre a VISITA (não sobre o horário da festa). Ofereça na mesma resposta 2 horários da lista que encaixam, com dia e hora. Se nenhum encaixa (ex.: ele quer à noite e as visitas vão só até a tarde), diga com gentileza quais são as janelas de visita e ofereça a opção mais próxima do que ele pediu (ex.: sábado de manhã). Nunca ofereça horário de visita fora das janelas nem escreva só "à noite"/"de manhã" sem a hora, e termine com uma pergunta para ele escolher.
-- Quando a pessoa confirmar dia e horário, use agendar_visita. Depois confirme por mensagem o dia/horário e diga que a equipe confirma a visita.
+${visitRules}
 
 REGRAS INTERNAS FICAM INTERNAS: as INFORMAÇÕES DO BUFFET trazem orientações para você (para quem oferecer algo, quando passar para a equipe, critérios). Siga, mas NUNCA repita esses critérios ao cliente (ex.: "não é aberta a todos", "só para quem tem interesse real em fechar") — fale só o que ele precisa saber, com simpatia.
-O QUE SÓ A EQUIPE FAZ: nunca diga que você marcou, agendou, reservou, garantiu, "deixou adiantado" ou "já combinou" algo que só a equipe faz (degustação, data da festa, condições, desconto). Diga que a equipe vai combinar isso com o cliente (ex.: "a equipe combina com você o dia da degustação"). Você só confirma o que fez de verdade com uma ferramenta (ex.: visita agendada com agendar_visita).
+O QUE SÓ A EQUIPE FAZ: nunca diga que você marcou, agendou, reservou, garantiu, "deixou adiantado" ou "já combinou" algo que só a equipe faz (degustação, data da festa, condições, desconto). Diga que a equipe vai combinar isso com o cliente (ex.: "a equipe combina com você o dia da degustação"). Você só confirma o que fez de verdade com uma ferramenta${teamVisits ? '' : ' (ex.: visita agendada com agendar_visita)'}.
 PASSAGEM PARA A EQUIPE: se disser ao cliente que um atendente ou a equipe vai seguir/continuar com ele, use transferir_para_atendente na mesma resposta — nunca prometa sem passar. Ao usar transferir_para_atendente, avise o cliente que um atendente vai continuar por aqui, sem escrever horários — o sistema acrescenta o horário de atendimento da equipe (veja SITUAÇÃO DESTA CONVERSA). As janelas de visita NÃO são o horário de atendimento da equipe: nunca use uma no lugar da outra.
 ${settings.extra_instructions ? `\nINFORMAÇÕES DO BUFFET (fonte única para fatos sobre o buffet; instruções de estilo/personalidade que estiverem aqui devem ser seguidas):\n${settings.extra_instructions}` : ''}${ctx.ownerNotesText ? `\n\nO QUE O DONO DO BUFFET TE ENSINOU (correções e orientações dele — siga sempre; valem mais que as INFORMAÇÕES DO BUFFET, os cadastros de pacotes e as regras de estilo acima; se uma delas contradisser outra, vale a mais recente, que é a de baixo. Só NÃO valem acima das REGRAS INEGOCIÁVEIS: valores só da ferramenta, nada de desconto, promessa ou reserva):\n${ctx.ownerNotesText}` : ''}`;
 
@@ -788,11 +808,16 @@ ${settings.extra_instructions ? `\nINFORMAÇÕES DO BUFFET (fonte única para fa
     ctx.pendingUserMessages > 1 ? `- O cliente mandou ${ctx.pendingUserMessages} mensagens seguidas desde a sua última resposta: responda a TODAS as perguntas delas numa única mensagem, sem ignorar nenhuma.` : '',
     ctx.crossedMessage ? '- ATENÇÃO: a mensagem do cliente chegou junto com a sua última resposta, então ele ainda não viu a sua pergunta. NÃO faça uma pergunta nova: responda só o que ele disse agora (se precisar) e deixe a sua pergunta anterior em aberto. Se não houver nada a responder, mande só uma frase curta.' : '',
     ctx.visitText ? `- Este cliente JÁ TEM VISITA MARCADA: ${ctx.visitText}. "Ok", "beleza", "obrigado" depois disso são só confirmação — responda com carinho, sem agendar de novo.` : '',
-    ctx.visitText && ctx.visitConfirmPending ? `- ATENÇÃO — PERGUNTAMOS AO CLIENTE SE ELE CONFIRMA ESSA VISITA (${ctx.visitText}) e ele ainda não tinha respondido. Se a resposta confirma (sim, ok, confirmo, vou sim, estarei aí, 👍, ❤️), chame confirmar_visita e responda curto e carinhoso que está tudo certo e que estamos esperando. Se ele não puder nesse dia/horário ou quiser trocar, ofereça 2 horários livres e use agendar_visita com remarcar=true quando ele escolher. Se ele disser que não vem mais, não insista: use transferir_para_atendente com o motivo "cliente avisou que não vem mais — desmarcar na agenda". Não pergunte de novo se ele confirma.` : '',
+    ctx.visitText && ctx.visitConfirmPending && teamVisits ? `- ATENÇÃO — PERGUNTAMOS AO CLIENTE SE ELE CONFIRMA ESSA VISITA (${ctx.visitText}) e ele ainda não tinha respondido. Se a resposta confirma, chame confirmar_visita e responda curto e carinhoso que está tudo certo. Se ele não puder, quiser trocar ou disser que não vem mais, use transferir_para_atendente (a equipe combina outro dia) — não ofereça horários.` : '',
+    ctx.visitText && ctx.visitConfirmPending && !teamVisits ? `- ATENÇÃO — PERGUNTAMOS AO CLIENTE SE ELE CONFIRMA ESSA VISITA (${ctx.visitText}) e ele ainda não tinha respondido. Se a resposta confirma (sim, ok, confirmo, vou sim, estarei aí, 👍, ❤️), chame confirmar_visita e responda curto e carinhoso que está tudo certo e que estamos esperando. Se ele não puder nesse dia/horário ou quiser trocar, ofereça 2 horários livres e use agendar_visita com remarcar=true quando ele escolher. Se ele disser que não vem mais, não insista: use transferir_para_atendente com o motivo "cliente avisou que não vem mais — desmarcar na agenda". Não pergunte de novo se ele confirma.` : '',
     `- Materiais já enviados nesta conversa: ${ctx.sentMaterialsText}.`,
-    `- Convite para visita nesta resposta: ${visitInviteRule(ctx.visitRepliesAgo, ctx.clientAffirmed)}`,
-    `- Horários de visita para sugerir (2 deles): ${offersText}.`,
-    `- Horários de visita livres nos próximos dias: ${ctx.visitSlotsText}.`,
+    ...(teamVisits
+      ? ['- Visitas: quem marca é a equipe (veja VISITAS). Não ofereça dia nem horário de visita.']
+      : [
+        `- Convite para visita nesta resposta: ${visitInviteRule(ctx.visitRepliesAgo, ctx.clientAffirmed)}`,
+        `- Horários de visita para sugerir (2 deles): ${offersText}.`,
+        `- Horários de visita livres nos próximos dias: ${ctx.visitSlotsText}.`,
+      ]),
     `- Horário de atendimento da equipe: ${ctx.teamHoursText}.`,
   ].filter(Boolean);
   const handoff = `${ctx.candidateLinkSent ? `\nATENÇÃO — ESTA PESSOA QUER TRABALHAR NO BUFFET e você já mandou o link do cadastro de candidatos (${ctx.candidateLinkSent}). Responda só sobre isso, curto e simpático: se ela só agradeceu ou confirmou ("ok", "obrigado"), despeça-se com carinho (ex.: "Imagina! Boa sorte 🍀 Qualquer dúvida no cadastro, é só chamar 😊", com o nome dela se souber); se tiver dúvida sobre o cadastro, explique (é rápido, pelo celular, e se o perfil combinar a equipe chama por aqui); se não conseguiu abrir, mande o link de novo, escrito exatamente assim: ${ctx.candidateLinkSent}. Não prometa vaga nem fale de salário. NÃO fale de festa, pacotes, valores nem visita e NÃO chame transferir_para_atendente de novo.` : ctx.afterHoursHandoff ? `\nATENÇÃO — ESTA CONVERSA JÁ FOI PASSADA PARA A EQUIPE (motivo: ${ctx.afterHoursHandoff.reason || 'não informado'}). A equipe está fora do horário agora e volta ${ctx.afterHoursHandoff.returns}. Enquanto isso, continue tirando dúvidas informativas com base nas informações do buffet (estrutura, o que tem, como funciona, materiais, horários de visita). Para o assunto que motivou a passagem e para negociação/fechamento, diga com gentileza que a equipe continua ${ctx.afterHoursHandoff.returns}. NÃO chame transferir_para_atendente de novo.` : ''}`.trim();
@@ -1385,7 +1410,7 @@ async function toolRegistrarDados(
   if (conv.__firstReply) {
     // Primeira resposta: apresentação primeiro, fotos/vídeo/PDF depois dela
     conv.__deferMaterials = true;
-    return `OK: dados salvos. As fotos, o vídeo e o PDF vão logo DEPOIS da sua resposta (não diga que já mandou). Escreva a resposta em DUAS partes, separadas por uma linha só com ---: a 1ª (antes dos materiais) se apresenta, responde o que o cliente disse e termina avisando que vai mostrar o espaço (ex.: "Vou te mostrar o nosso espaço 😍👇"); a 2ª (depois do PDF) é UMA frase curta convidando para conhecer o espaço, com os 2 horários de visita livres que você tem (ex.: "Se fizer sentido pra vocês, te recebo pra conhecer o espaço: amanhã às 10h ou quinta às 15h, qual fica melhor? 😊") — se ele já tem visita marcada, pergunte só o que achou. Na 1ª parte, não passe valores nem convide para visita, a menos que o cliente tenha pedido.${minNote}`;
+    return `OK: dados salvos. As fotos, o vídeo e o PDF vão logo DEPOIS da sua resposta (não diga que já mandou). Escreva a resposta em DUAS partes, separadas por uma linha só com ---: a 1ª (antes dos materiais) se apresenta, responde o que o cliente disse e termina avisando que vai mostrar o espaço (ex.: "Vou te mostrar o nosso espaço 😍👇"); ${conv.__teamVisits ? 'a 2ª (depois do PDF) é UMA frase curta perguntando o que ele achou do espaço (neste buffet quem marca as visitas é a equipe: não ofereça dia nem horário de visita)' : 'a 2ª (depois do PDF) é UMA frase curta convidando para conhecer o espaço, com os 2 horários de visita livres que você tem (ex.: "Se fizer sentido pra vocês, te recebo pra conhecer o espaço: amanhã às 10h ou quinta às 15h, qual fica melhor? 😊") — se ele já tem visita marcada, pergunte só o que achou'}. Na 1ª parte, não passe valores nem convide para visita, a menos que o cliente tenha pedido.${minNote}`;
   }
   if (conv.__holdMaterials) return `OK: dados salvos. Ainda não mande materiais: a mensagem do cliente não deixa claro que é sobre a festa — pergunte antes como pode ajudar.${minNote}`;
   return await autoSendMaterials(supabase, instance, conv, phone, contactName, botSettings, args, minNote, askedGuests);
@@ -1483,6 +1508,8 @@ async function autoSendMaterials(
   if (askDay) await mergeBotData(supabase, conv, { dia_perguntado: new Date().toISOString() });
   const nextStep = askDay
     ? ` Não reenvie nada: comente brevemente e pergunte, de forma natural, se ele já tem um DIA em mente${bd.mes ? ` em ${String(bd.mes).toLowerCase()}` : ''}, para você conferir na agenda se está livre (ex.: "Vocês já têm um dia em mente em dezembro? Assim já confiro aqui na agenda se está livre 😊"). NESTA resposta NÃO convide para visita — o convite vem depois que ele responder o dia.`
+    : conv.__teamVisits
+    ? ' Não reenvie nada: comente brevemente e pergunte o que ele achou do espaço (não ofereça dia nem horário de visita: quem marca é a equipe).'
     : ' Não reenvie nada: comente brevemente e, se você não convidou para visita nas últimas 3 respostas, convide oferecendo 2 horários concretos.';
   return `OK: dados salvos e os materiais foram enviados agora, automaticamente, com as legendas (confirmados pelo WhatsApp: ${confirmedText}).${skippedNote}${nextStep}${unconfirmedNote(ack.unconfirmed, ack.confirmed)}${minNote}${pdfNote}`;
 }
@@ -2469,6 +2496,7 @@ export async function maybeHandleWithAiAgent(
     }
     const isFirstReply = !chatMessages.some((m) => m.role === 'assistant' && !m.content.startsWith('🧪'));
     conv.__firstReply = isFirstReply;
+    conv.__teamVisits = teamSchedulesVisits(settings);
     conv.__corporateEnabled = settings.corporate_events_enabled === true;
     const { merged: mergedHistory, pendingUserMessages } = mergeConsecutiveTurns(chatMessages);
     // Na retomada, a "mensagem" que dispara não é do cliente: vale a última dele
@@ -2508,7 +2536,7 @@ export async function maybeHandleWithAiAgent(
         conv.__partyDate = pendingDate ? await checkPartyDate(supabase, instance, settings, pendingDate) : null;
         materialsNote = conv.__partyDate && conv.__partyDate.status !== 'free'
           ? 'logo DEPOIS da sua resposta, o sistema vai mandar as fotos do espaço, o vídeo e o PDF dos pacotes (com legendas próprias) e, depois do PDF, uma mensagem sobre a data da festa. Escreva UMA parte só (sem ---): responda o que o cliente disse (se ele cumprimentou, cumprimente de volta) e termine avisando, com naturalidade, que vai mostrar o espaço — ex.: "Vou te mostrar o nosso espaço 😍👇". NÃO diga que já mandou. NÃO fale se a data está livre ou reservada e NÃO convide para visita nesta resposta. Não passe valores, a menos que o cliente tenha pedido.'
-          : 'logo DEPOIS da sua resposta, o sistema vai mandar as fotos do espaço, o vídeo e o PDF dos pacotes (com legendas próprias). Escreva a resposta em DUAS partes, separadas por uma linha só com ---. A 1ª parte sai ANTES dos materiais: responda o que o cliente disse (se ele cumprimentou, cumprimente de volta) e termine avisando, com naturalidade, que vai mostrar o espaço — ex.: "Vou te mostrar o nosso espaço 😍👇". A 2ª parte sai DEPOIS do PDF: UMA frase curta convidando para conhecer o espaço, com os 2 horários de visita livres que você tem — ex.: "Se fizer sentido pra vocês, te recebo pra conhecer o espaço: amanhã às 10h ou quinta às 15h, qual fica melhor? 😊" (se ele já tem visita marcada, pergunte só o que achou). NÃO diga que já mandou. Na 1ª parte, não passe valores nem convide para visita, a menos que o cliente tenha pedido.' + (conv.__partyDate ? ' Não diga se a data está livre: o sistema já conta isso antes da sua 2ª parte.' : '');
+          : 'logo DEPOIS da sua resposta, o sistema vai mandar as fotos do espaço, o vídeo e o PDF dos pacotes (com legendas próprias). Escreva a resposta em DUAS partes, separadas por uma linha só com ---. A 1ª parte sai ANTES dos materiais: responda o que o cliente disse (se ele cumprimentou, cumprimente de volta) e termine avisando, com naturalidade, que vai mostrar o espaço — ex.: "Vou te mostrar o nosso espaço 😍👇". ' + (conv.__teamVisits ? 'A 2ª parte sai DEPOIS do PDF: UMA frase curta perguntando o que ele achou do espaço (quem marca as visitas é a equipe: não ofereça dia nem horário de visita).' : 'A 2ª parte sai DEPOIS do PDF: UMA frase curta convidando para conhecer o espaço, com os 2 horários de visita livres que você tem — ex.: "Se fizer sentido pra vocês, te recebo pra conhecer o espaço: amanhã às 10h ou quinta às 15h, qual fica melhor? 😊" (se ele já tem visita marcada, pergunte só o que achou).') + ' NÃO diga que já mandou. Na 1ª parte, não passe valores nem convide para visita, a menos que o cliente tenha pedido.' + (conv.__partyDate ? ' Não diga se a data está livre: o sistema já conta isso antes da sua 2ª parte.' : '');
       } else {
         // Lead do site com data e convidados, mas a resposta não fala da festa
         // (só "oi", uma foto solta, outro assunto): pergunta antes de mandar
@@ -2525,7 +2553,7 @@ export async function maybeHandleWithAiAgent(
       bd.mes ? `mês ${bd.mes}` : null,
       bd.convidados ? `${bd.convidados}` : null,
       bd.dia_perguntado && !bd.data_festa && bd.mes
-        ? 'DIA DA FESTA: ainda não sabemos — você perguntou se ele já tem um dia em mente. Se ele disser um dia, use consultar_datas_livres com essa data e conte se está livre; se estiver, convide para conhecer o espaço com 2 horários. Se ele ainda não souber o dia, siga com o convite para a visita'
+        ? 'DIA DA FESTA: ainda não sabemos — você perguntou se ele já tem um dia em mente. Se ele disser um dia, use consultar_datas_livres com essa data e conte se está livre; se estiver, ' + (conv.__teamVisits ? 'comemore e siga a conversa' : 'convide para conhecer o espaço com 2 horários') + '. Se ele ainda não souber o dia, siga com o convite para a visita'
         : null,
       bd.tipo_evento === 'empresa' ? `EMPRESA — confraternização${bd.empresa ? ` da ${bd.empresa}` : ''} (não pergunte de aniversariante)` : null,
       typeof bd.data_festa === 'string' && bd.data_ocupada_avisada === bd.data_festa
@@ -2624,7 +2652,7 @@ export async function maybeHandleWithAiAgent(
       system: promptParts.stable,
       systemDynamic: promptParts.dynamic,
       history: mergedHistory,
-      tools: visitConfirmPending ? [...TOOLS, CONFIRM_VISIT_TOOL] : TOOLS,
+      tools: [...(teamSchedulesVisits(settings) ? TOOLS.filter((t) => t.name !== 'agendar_visita') : TOOLS), ...(visitConfirmPending ? [CONFIRM_VISIT_TOOL] : [])],
       openaiKey,
       anthropicKey,
     });
@@ -2906,7 +2934,7 @@ export async function maybeHandleWithAiAgent(
             const firstName = firstNameOrEmpty(String(bd.nome || ''));
             const seed = Math.floor(Date.now() / 1000);
             const recentInvite = repliesSinceVisitInvite(chatMessages);
-            const canInvite = !leadVisit && !(recentInvite !== null && recentInvite < 3) && !clientDeclined(lastUserText);
+            const canInvite = !teamSchedulesVisits(settings) && !leadVisit && !(recentInvite !== null && recentInvite < 3) && !clientDeclined(lastUserText);
             // Sem o dia da festa (só o mês): pergunta o dia antes do convite
             // (autoSendMaterials já marcou dia_perguntado quando o PDF saiu)
             const bdAfter = (conv.bot_data || {}) as Json;

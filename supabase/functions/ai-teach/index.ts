@@ -1,7 +1,7 @@
 // "Ensinar a IA" (Configurações → Inteligência Artificial → Testar e ensinar):
 // POST { action: "transcribe", company_id, audio_base64, mime } → { text }
 // POST { action: "propose", company_id, text, cliente?, resposta? }
-//   → { notes: [{ text, kind }], blocked, packageHint }
+//   → { notes: [{ text, kind }], blocked, packageHint, visitHint }
 // Só sugere: quem grava (ai_owner_notes) é a tela, depois que o dono confirma.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";

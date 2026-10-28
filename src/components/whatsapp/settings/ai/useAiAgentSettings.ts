@@ -54,6 +54,8 @@ export interface AiAgentSettings {
   // Confraternização de empresas
   corporate_events_enabled?: boolean | null;
   corporate_max_guests?: number | null;
+  // Quem marca as visitas: 'ia' (padrão) ou 'equipe' (a IA não oferece horários)
+  visit_scheduling?: "ia" | "equipe" | null;
 }
 
 export const BASE_COLUMNS = "id, enabled, unit, activated_at, extra_instructions, visit_hours, test_mode_enabled, test_mode_number, model";
@@ -145,6 +147,7 @@ export function useAiAgentSettings() {
       ...(next.corporate_events_enabled !== undefined
         ? { corporate_events_enabled: next.corporate_events_enabled === true, corporate_max_guests: next.corporate_max_guests ?? null }
         : {}),
+      ...(next.visit_scheduling !== undefined ? { visit_scheduling: next.visit_scheduling === "equipe" ? "equipe" : "ia" } : {}),
       updated_at: new Date().toISOString(),
     };
     const save = (body: Record<string, unknown>, columns: string) =>
