@@ -24,7 +24,7 @@ export default function HubLandingPage() {
     <div className="hub-lp min-h-screen bg-white pb-20 font-inter text-[#0F1222] antialiased sm:pb-0">
       <Helmet>
         <title>Celebrei | A melhor plataforma para buffets infantis</title>
-        <meta name="description" content="Transforme leads em festas fechadas com uma atendente de IA no WhatsApp + CRM. Plataforma completa para buffets infantis, a partir de R$ 999/mês." />
+        <meta name="description" content="Transforme leads em festas fechadas com uma atendente de IA no WhatsApp + CRM. Plataforma completa para buffets infantis, a partir de R$ 1.299/mês." />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap"
