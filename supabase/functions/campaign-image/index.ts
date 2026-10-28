@@ -219,10 +219,10 @@ ABSOLUTE RULE: Do NOT add ANY text, letters, words, numbers, banners with text, 
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const filePath = `campaigns/composed-${Date.now()}.png`;
+    const filePath = `campaigns/composed-${Date.now()}.${isGpt ? "jpg" : "png"}`;
     const { error: uploadError } = await supabase.storage
       .from("sales-materials")
-      .upload(filePath, bytes, { contentType: "image/png", upsert: false });
+      .upload(filePath, bytes, { contentType: isGpt ? "image/jpeg" : "image/png", upsert: false });
 
     if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
 
