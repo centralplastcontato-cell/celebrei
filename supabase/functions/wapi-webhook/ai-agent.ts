@@ -2751,11 +2751,12 @@ export async function maybeHandleWithAiAgent(
           } else if (call.name === 'transferir_para_atendente') {
             const motivo = String(args.motivo || '');
             // Visita (marcar, trocar, outro horário) a IA resolve sozinha — o
-            // simulador pegou ela passando "troca de visita" para a equipe
+            // simulador pegou ela passando "troca de visita" para a equipe.
+            // Quando quem marca é a equipe, a visita vai justamente para ela.
             if (singleVenue && /unidade|filial/i.test(motivo) && !/atendente|pessoa|humano|reclama/i.test(motivo)) {
               toolResult = `NÃO TRANSFIRA por causa de unidade: o ${companyName} tem um único espaço (o endereço das informações do buffet), não existe outra unidade. Diga isso com naturalidade ao cliente e siga a conversa.`;
               console.log(`[AI Agent] Passagem por "outra unidade" recusada — espaço único (conv ${conv.id})`);
-            } else if (/visita|remarc/i.test(motivo) && !/atendente|pessoa|humano|reclama/i.test(motivo)) {
+            } else if (!teamSchedulesVisits(settings) && /visita|remarc/i.test(motivo) && !/atendente|pessoa|humano|reclama/i.test(motivo)) {
               toolResult = 'NÃO TRANSFIRA por causa de visita: você mesma resolve. Ofereça horários livres da lista de visitas do sistema (2 opções no dia/turno que o cliente pediu) e, quando ele escolher, use agendar_visita — com remarcar=true se ele já tem visita marcada.';
               console.log(`[AI Agent] Passagem por visita recusada (conv ${conv.id}): ${motivo.slice(0, 80)}`);
             } else {
