@@ -18,14 +18,18 @@ const IDEAS = [
   "Pergunte uma regra (bolo de fora, decoração, horário)",
 ];
 
-/** "Minha IA": o dono testa como a IA atende, sem nada sair pelo WhatsApp */
-export function AiTestSection() {
+/**
+ * "Minha IA": testar como a IA atende, sem nada sair pelo WhatsApp. O teste é
+ * de toda a equipe; o resto (motivos de passagem, alerta, imagens) só de quem
+ * gerencia o buffet.
+ */
+export function AiTestSection({ canManage = true }: { canManage?: boolean }) {
   const { currentCompany } = useCompany();
   const [open, setOpen] = useState(false);
   if (!currentCompany) return null;
   return (
     <div className="max-w-xl space-y-4">
-      {signupStatus(currentCompany.settings) && (
+      {canManage && signupStatus(currentCompany.settings) && (
         <Card>
           <CardContent className="space-y-3 pt-6">
             <p className="font-medium">WhatsApp do buffet</p>
@@ -51,6 +55,7 @@ export function AiTestSection() {
           <p className="text-xs text-muted-foreground">Alguma resposta errada? Avise a equipe Celebrei que a gente ajusta.</p>
         </CardContent>
       </Card>
+      {canManage && (<>
       <Card>
         <CardContent className="space-y-3 pt-6">
           <p className="font-medium">O que a IA passou para a equipe</p>
@@ -69,6 +74,7 @@ export function AiTestSection() {
           <AiImagesEditor companyId={currentCompany.id} showFollowUps />
         </CardContent>
       </Card>
+      </>)}
       <AiTestChat open={open} onOpenChange={setOpen} companyId={currentCompany.id} />
     </div>
   );

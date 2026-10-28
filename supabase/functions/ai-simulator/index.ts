@@ -196,10 +196,12 @@ async function chat(req: Request, body: any): Promise<Response> {
   const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   const { data: { user } } = jwt ? await admin.auth.getUser(jwt) : { data: { user: null } };
   if (!user) return json({ error: "Faça login" }, 401);
+  // Qualquer usuário do buffet pode testar (28/10: o Rodrigo, do Mega Magic, usa o
+  // login de uma vendedora). O teste é isolado: não envia nem grava nada.
   const { data: link } = await admin.from("user_companies").select("role").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
-  if (!link || !["owner", "admin"].includes(link.role)) {
+  if (!link) {
     const { data: isAdmin } = await admin.rpc("is_admin", { _user_id: user.id });
-    if (isAdmin !== true) return json({ error: "Só o dono do buffet pode testar a IA" }, 403);
+    if (isAdmin !== true) return json({ error: "Seu usuário não tem acesso a este buffet" }, 403);
   }
   const { data: settings } = await admin.from("ai_agent_settings").select("*").eq("company_id", companyId).maybeSingle();
   if (!settings) return json({ error: "Responda as perguntas da IA antes de testar" }, 400);
