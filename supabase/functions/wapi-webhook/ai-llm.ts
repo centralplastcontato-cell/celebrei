@@ -14,6 +14,7 @@ import {
   normalizeOpenAiUsage,
   providerForModel,
 } from "../_shared/ai-models.ts";
+import { CLAUDE_BACKUP_MODEL, ClaudeWithBackupSession } from "./ai-llm-backup.ts";
 
 export interface ChatTurn {
   role: "user" | "assistant";
@@ -204,7 +205,11 @@ class AnthropicSession implements LlmSession {
 // Devolve null quando falta a chave do provedor do modelo escolhido.
 export function createLlmSession(input: LlmSessionInput): LlmSession | null {
   if (providerForModel(input.model) === "anthropic") {
-    return input.anthropicKey ? new AnthropicSession({ ...input, anthropicKey: input.anthropicKey }) : null;
+    if (!input.anthropicKey) return null;
+    const claude = new AnthropicSession({ ...input, anthropicKey: input.anthropicKey });
+    return new ClaudeWithBackupSession(claude, () =>
+      input.openaiKey ? new OpenAiSession({ ...input, model: CLAUDE_BACKUP_MODEL, openaiKey: input.openaiKey }) : null
+    );
   }
   return input.openaiKey ? new OpenAiSession({ ...input, openaiKey: input.openaiKey }) : null;
 }
