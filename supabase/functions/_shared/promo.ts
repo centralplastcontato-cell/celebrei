@@ -40,6 +40,33 @@ export function findPromotion(extra: string | null | undefined, todayYmd: string
   return null;
 }
 
+const MONTHS = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+/**
+ * Ano da festa pelo que a conversa já sabe: a data exata ou o mês ("Fevereiro",
+ * "fevereiro/27"). Mês sem ano que já passou neste ano = ano que vem.
+ */
+export function partyYearOf(dataFesta: unknown, mes: unknown, todayYmd: string): number | null {
+  if (typeof dataFesta === "string" && /^20\d{2}-\d{2}-\d{2}/.test(dataFesta)) return Number(dataFesta.slice(0, 4));
+  const text = String(mes || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const y = text.match(/\b(20\d{2})\b/) || text.match(/[/\s-](\d{2})\b/);
+  if (y) return y[1].length === 4 ? Number(y[1]) : 2000 + Number(y[1]);
+  const idx = MONTHS.findIndex((m) => text.includes(m));
+  if (idx < 0) return null;
+  const [ty, tm] = todayYmd.split("-").map(Number);
+  return idx + 1 < tm ? ty + 1 : ty;
+}
+
+/** A promoção vale para a festa? Sem ano na promoção ou sem ano da festa conhecido: vale */
+export function promoFitsParty(p: Promotion, partyYear: number | null): boolean {
+  return !p.partyYear || !partyYear || p.partyYear === partyYear;
+}
+
+/** Festa fora do ano da promoção: a IA não pode oferecer (a regra está nas informações do buffet) */
+export function promoOffNote(p: Promotion, partyYear: number): string {
+  return `PROMOÇÃO NÃO VALE PARA ESTE CLIENTE: ${p.title} é só para festas em ${p.partyYear} e a festa dele é em ${partyYear}. NÃO fale dessa promoção nem dos benefícios dela; se o cliente perguntar, explique com gentileza que ela é só para festas em ${p.partyYear}.`;
+}
+
 /** "faltam 10 dias" / "termina amanhã" / "termina HOJE" */
 export function promoCountdown(p: Promotion): string {
   if (p.daysLeft === 0) return "termina HOJE";

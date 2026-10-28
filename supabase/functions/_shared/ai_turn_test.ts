@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/assert_equals.ts";
-import { askPartyDayAfterMaterials, needsPartyDay, clientAffirms, clientAskedPrice, closingAfterMaterials, friendlyVisitSlot, hasVisitInvite, visitInviteAfterMaterials, confirmsPartyInterest, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, priceRequestPending, pickLatestIncoming, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, teamRepliedAfter } from "./ai-turn.ts";
+import { askPartyDayAfterMaterials, needsPartyDay, clientAffirms, clientAskedPrice, closingAfterMaterials, friendlyVisitSlot, hasVisitInvite, visitInviteAfterMaterials, confirmsPartyInterest, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, priceRequestPending, pickLatestIncoming, promisesTeamHandoff, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, teamRepliedAfter } from "./ai-turn.ts";
 
 Deno.test("pickLatestIncoming: a última mensagem do cliente responde por todas", () => {
   assertEquals(pickLatestIncoming([
@@ -295,4 +295,16 @@ Deno.test("dayPreferenceFrom: 'na semana' é dia de semana; 'semana que vem' nã
   assertEquals(dayPreferenceFrom("Ou para segunda semana de janeiro"), null);
   assertEquals(dayPreferenceFrom("dia de semana ou fim de semana?"), null);
   assertEquals(dayPreferenceFrom("Datas livres para 2026 dezembro"), null);
+});
+
+Deno.test("promisesTeamHandoff: promessa de a equipe seguir (Claudia, 27/10)", () => {
+  assertEquals(promisesTeamHandoff("Desconto é com a equipe 😊 Um atendente vai seguir com você por aqui, combinado?"), true);
+  assertEquals(promisesTeamHandoff("Nossa equipe vai continuar o seu atendimento."), true);
+  assertEquals(promisesTeamHandoff("Vou passar para a equipe, tá bom?"), true);
+  assertEquals(promisesTeamHandoff("Vou pedir para alguém da nossa equipe continuar com você."), true);
+  assertEquals(promisesTeamHandoff("A equipe já vai falar com você sobre a degustação."), true);
+  // Visita é da IA; equipe que só confirma não é passagem
+  assertEquals(promisesTeamHandoff("Na visita, nossa equipe vai te atender e mostrar o espaço!"), false);
+  assertEquals(promisesTeamHandoff("As condições de pagamento são com a equipe no fechamento."), false);
+  assertEquals(promisesTeamHandoff("Que tal conhecer o espaço? Tenho sábado às 10h."), false);
 });

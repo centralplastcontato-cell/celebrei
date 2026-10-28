@@ -21,7 +21,7 @@ import { mentionsLaterTime, parseReturnJson, RETURN_HOUR, RETURN_STALE_REPLY_MS,
 import { createLlmSession } from "../wapi-webhook/ai-llm.ts";
 import { DEFAULT_AI_MODEL, estimateChatCostUsd, providerForModel } from "../_shared/ai-models.ts";
 import { visitStartMs } from "../_shared/visit-confirm.ts";
-import { findPromotion } from "../_shared/promo.ts";
+import { findPromotion, promoFitsParty } from "../_shared/promo.ts";
 import { friendlyVisitSlot } from "../_shared/ai-turn.ts";
 import { freeVisitSlots } from "../_shared/visit-offers.ts";
 import { loadBlockedContacts } from "../_shared/contact-block.ts";
@@ -3321,7 +3321,9 @@ async function processPostVisit({ supabase }: { supabase: SupabaseAdmin }): Prom
           partyFree = (await freeSlotsBetween(supabase, ai, companyId, partyYmd, partyYmd)).length > 0;
         }
         const offers = step === "no_show" && ai ? await visitOffers(supabase, companyId, ai, nowMs, todayYmd) : [];
-        const promo = findPromotion(ai?.extra_instructions, todayYmd);
+        const promoFound = findPromotion(ai?.extra_instructions, todayYmd);
+        // Festa fora do ano da promoção: a mensagem pós-visita não cita
+        const promo = promoFound && promoFitsParty(promoFound, partyYmd ? Number(partyYmd.slice(0, 4)) : null) ? promoFound : null;
         const text = postVisitMessage(step, {
           firstName: firstNameOf(lead.name || conv.contact_name),
           companyName: String(company?.name || "buffet"),
