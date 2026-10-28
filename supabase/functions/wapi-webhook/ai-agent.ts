@@ -9,7 +9,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { findLeadByPhone } from "../_shared/lead-phone.ts";
 import { parseGuestCount, pickPackagePdfs } from "../_shared/package-pdf.ts";
-import { DEFAULT_AI_MODEL, estimateChatCostUsd, providerForModel } from "../_shared/ai-models.ts";
+import { DEFAULT_AI_MODEL, estimateChatCostUsd, NO_ANTHROPIC_KEY_MODEL, providerForModel } from "../_shared/ai-models.ts";
 import { type ChatTurn, createLlmSession, type LlmStep, type ToolDef } from "./ai-llm.ts";
 import { describeImage, fetchMediaBytes, mediaHistoryText, transcribeAudio } from "./ai-media.ts";
 import {
@@ -2336,8 +2336,8 @@ export async function maybeHandleWithAiAgent(
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') || null;
     let model = sandbox?.model || ((isAiTestPhone && settings.test_model) ? settings.test_model : (settings.model || DEFAULT_AI_MODEL));
     if (providerForModel(model) === 'anthropic' && !anthropicKey) {
-      console.error(`[AI Agent] Modelo ${model} escolhido, mas ANTHROPIC_API_KEY não está configurada — usando ${DEFAULT_AI_MODEL}`);
-      model = DEFAULT_AI_MODEL;
+      console.error(`[AI Agent] Modelo ${model} escolhido, mas ANTHROPIC_API_KEY não está configurada — usando ${NO_ANTHROPIC_KEY_MODEL}`);
+      model = NO_ANTHROPIC_KEY_MODEL;
     }
     if (providerForModel(model) === 'openai' && !openaiKey) {
       console.error('[AI Agent] OPENAI_API_KEY not configured — falling back to fixed bot');

@@ -23,10 +23,14 @@ export interface AiModelInfo {
   thinks: boolean;
 }
 
-export const DEFAULT_AI_MODEL = "gpt-4o-mini";
+// Modelo de quem ainda não escolheu (buffets novos): o mesmo nível do Castelo
+// (28/10 — "tudo igual"). Antes era o GPT-4o mini, o mais simples.
+export const DEFAULT_AI_MODEL = "claude-sonnet-5-5";
+// Sem a chave da Anthropic no Supabase, os modelos Claude caem para este
+export const NO_ANTHROPIC_KEY_MODEL = "gpt-5.4";
 
 export const AI_MODELS: AiModelInfo[] = [
-  { id: "gpt-4o-mini", provider: "openai", label: "GPT-4o mini (OpenAI)", hint: "O atual — o mais barato, o mais simples", inputPerM: 0.15, cachedInputPerM: 0.075, cacheWritePerM: 0, outputPerM: 0.6, thinks: false },
+  { id: "gpt-4o-mini", provider: "openai", label: "GPT-4o mini (OpenAI)", hint: "O mais barato, o mais simples", inputPerM: 0.15, cachedInputPerM: 0.075, cacheWritePerM: 0, outputPerM: 0.6, thinks: false },
   { id: "gpt-5.4-mini", provider: "openai", label: "GPT-5.4 mini (OpenAI)", hint: "Bem melhor que o 4o mini, ainda barato", inputPerM: 0.75, cachedInputPerM: 0.075, cacheWritePerM: 0, outputPerM: 4.5, thinks: false },
   { id: "gpt-5.4", provider: "openai", label: "GPT-5.4 (OpenAI)", hint: "O forte da OpenAI para produção", inputPerM: 2.5, cachedInputPerM: 0.25, cacheWritePerM: 0, outputPerM: 15, thinks: false },
   { id: "claude-haiku-4-5", provider: "anthropic", label: "Claude Haiku 4.5 (Anthropic)", hint: "Rápido e barato", inputPerM: 1, cachedInputPerM: 0.1, cacheWritePerM: 1.25, outputPerM: 5, thinks: false },

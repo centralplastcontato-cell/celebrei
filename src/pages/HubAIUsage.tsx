@@ -11,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveCont
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import { AI_MODELS, getAiModel, formatBrlFromUsd, formatUsd } from "@/lib/aiModels";
+import { AI_MODELS, DEFAULT_AI_MODEL, getAiModel, formatBrlFromUsd, formatUsd } from "@/lib/aiModels";
 import { PROVIDER_LABELS, summarizeHubAiUsage, type AgentUsageRow, type LogUsageRow } from "@/lib/hubAiUsage";
 
 interface CompanyInfo {
@@ -55,7 +55,7 @@ export default function HubAIUsage() {
       setAgentRows(agent);
       setLogs(logRows);
       setCompanies(companiesRes.data || []);
-      setModels(Object.fromEntries(((settingsRes.data || []) as Array<{ company_id: string; model: string | null }>).map((r) => [r.company_id, r.model || "gpt-4o-mini"])));
+      setModels(Object.fromEntries(((settingsRes.data || []) as Array<{ company_id: string; model: string | null }>).map((r) => [r.company_id, r.model || DEFAULT_AI_MODEL])));
     } catch (err) {
       console.error("HubAIUsage:", err);
       toast.error("Não consegui carregar o consumo de IA");
