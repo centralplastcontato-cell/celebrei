@@ -208,6 +208,24 @@ export function asksPartnership(text: string): boolean {
       /(?<![\p{L}])(divulg\p{L}*|post\p{L}*|stories|story|reels|publi\p{L}*|troca|marcar|mostrar)(?![\p{L}])/iu.test(t));
 }
 
+/**
+ * A resposta da IA promete que alguém da equipe vai assumir ("um atendente vai
+ * seguir com você por aqui"). Claudia (27/10): a IA prometeu e não passou, e os
+ * lembretes automáticos continuaram. Equipe que só confirma algo não conta.
+ */
+export function promisesTeamHandoff(text: string): boolean {
+  // Visita é da IA: "a equipe vai te atender na visita" não é passagem
+  return (text || "").split(/(?<=[.!?\n])\s*/).some((t) => !/visita/i.test(t) && promiseIn(t));
+}
+
+function promiseIn(t: string): boolean {
+  const who = "(?:um|uma|o|a|nossa|nosso)?\\s*(?:atendente|consultor\\p{L}*|vendedor\\p{L}*|equipe|time|pessoa da (?:nossa )?equipe|algu[ée]m da (?:nossa )?equipe)";
+  const go = "(?:vai|v[ãa]o|ir[áã]o?|j[áa] vai|vai j[áa]) (?:seguir|continuar|assumir|dar (?:sequ[êe]ncia|continuidade)|te atender|atender voc[êe]|falar com voc[êe]|te chamar|entrar em contato)";
+  return new RegExp(`(?<![\\p{L}])${who}\\s+(?:\\p{L}+\\s+)?${go}`, "iu").test(t) ||
+    /(?<![\p{L}])vou (?:te )?(?:passar|transferir|encaminhar) (?:voc[êe] |seu atendimento |nossa conversa |a conversa |o atendimento )?para (?:a |o |um |uma |nossa |nosso )?(?:equipe|atendente|time|consultor\p{L}*)/iu.test(t) ||
+    /(?<![\p{L}])vou pedir (?:para|pra) (?:algu[ée]m|um atendente|uma atendente|a equipe|nossa equipe) (?:da (?:nossa )?equipe )?(?:seguir|continuar|te atender|falar com voc[êe]|te chamar|assumir)/iu.test(t);
+}
+
 export type ContactIntent = "trabalhar" | "fornecedor" | "cliente_com_festa" | "duvida_festa";
 
 /**

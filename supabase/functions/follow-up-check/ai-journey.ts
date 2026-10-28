@@ -13,7 +13,7 @@ import { followupLabel, inSendWindowBR, type JourneyContext, type JourneyMessage
 import { checkFollowUpText, followUpInstruction } from "../_shared/ai-followup-text.ts";
 import type { MaterialKind } from "../_shared/material-claims.ts";
 import { phoneVariantsBR } from "../_shared/ai-site-lead.ts";
-import { findPromotion, promoCountdown } from "../_shared/promo.ts";
+import { findPromotion, partyYearOf, promoCountdown, promoFitsParty, promoOffNote } from "../_shared/promo.ts";
 import { formatDateLong, formatDayHeader, formatSlotLabel, formatSlotRange } from "../_shared/whatsapp-format.ts";
 import { addDaysYmd, type FreeSlot, freePartySlots, parsePartySlots, weekdayOf } from "../_shared/party-availability.ts";
 import { isClosedDay, parseClosedPeriods } from "../_shared/closed-periods.ts";
@@ -436,7 +436,10 @@ export async function runAiJourney(
           ? cfg.reactivation.image_url || null
           : null;
         const partyYmd = typeof bd.data_festa === "string" && bd.data_festa >= todayYmd ? bd.data_festa : null;
-        const promo = findPromotion(settings.extra_instructions, todayYmd);
+        const promoFound = findPromotion(settings.extra_instructions, todayYmd);
+        // Festa fora do ano da promoção: o lembrete não oferece (Claudia, festa em 2027)
+        const partyYear = partyYearOf(bd.data_festa, bd.mes, todayYmd);
+        const promo = promoFound && promoFitsParty(promoFound, partyYear) ? promoFound : null;
         const dateFree = partyYmd ? await partyDateFreeSlots(supabase, settings, instance.company_id, partyYmd) : null;
         // Datas alternativas reais: data pedida já reservada (qualquer mensagem
         // da jornada) ou, no lembrete antes da festa, só o mês
@@ -467,7 +470,9 @@ export async function runAiJourney(
           partyMonth: bd.mes || null,
           guests: bd.convidados || null,
           partyDateFree: dateFree,
-          promoLine: promo && !atStart
+          promoLine: promoFound && !promo && partyYear
+            ? promoOffNote(promoFound, partyYear)
+            : promo && !atStart
             ? `PROMOÇÃO EM VIGOR (pode citar uma vez, se combinar com o objetivo): ${promo.title} — vai até ${formatDateLong(promo.endYmd)} (${promoCountdown(promo)}); regras nas informações do buffet.${promo.partyYear ? ` Só para festas em ${promo.partyYear}.` : ""}`
             : null,
           valuesAlreadyGiven: previousAssistant.some((t) => /R\$/.test(t)),

@@ -38,13 +38,13 @@ import { loadAiConversationalEnabled } from "../_shared/ai-module.ts";
 import { aiUnitFor, aiUnits } from "../_shared/ai-units.ts";
 import { inSandbox, sandboxSleep } from "./ai-sandbox.ts";
 import { buildCandidateLink, candidateName, inviteCode, shortCandidateLink, withCandidateLink } from "../_shared/ai-candidate.ts";
-import { findPromotion, promoMentions, promoNote } from "../_shared/promo.ts";
+import { findPromotion, partyYearOf, promoFitsParty, promoMentions, promoNote, promoOffNote } from "../_shared/promo.ts";
 import { campaignPromptNote, loadCampaignContext } from "../_shared/campaign-context.ts";
 import { closedPeriodAt, closedPeriodsNote, formatClosedPeriod, isClosedDay, parseClosedPeriods } from "../_shared/closed-periods.ts";
 import { dayWithArticle, nearestAlternativeDays, partyDateFreeNote, partyDateTakenMessage } from "../_shared/party-date-check.ts";
 import { parseSlotPriority, priorityAlternatives, priorityMonthDates } from "../_shared/slot-priority.ts";
 import { birthdayFlavored, corporateCaptions, corporateLeadNote, corporatePromptBlock, mentionsCorporate } from "../_shared/corporate-event.ts";
-import { AI_INBOUND_LAG_MS, asksPartnership, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
+import { AI_INBOUND_LAG_MS, asksPartnership, promisesTeamHandoff, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
 import { firstNameOrEmpty, sendQualificationMaterials } from "./qualification-materials.ts";
 import { askedForName, nameFromAnswer } from "../_shared/name-answer.ts";
 import { falseMaterialClaims, hasMaterialClaim, hasSubstance, refersToMaterial, stripFalseMaterialClaims } from "../_shared/material-claims.ts";
@@ -699,7 +699,7 @@ REGRAS INEGOCIÁVEIS:
    VALOR SÓ PARA QUEM PERGUNTA O PREÇO: passe valores só quando o cliente perguntar o preço (preço, valor, quanto fica/custa, "e o investimento?"). Pedir "orçamento" ou escolher a opção de orçamento NÃO é perguntar o preço: ele recebe fotos, vídeo e o PDF dos pacotes, e você conduz para a data e a visita, sem escrever valores. Por iniciativa própria, não passe valores nem ofereça passar ("quer que eu te passe os valores?") — mesmo que as informações do buffet digam "informe o valor". Quem não perguntou já tem o PDF de pacotes; conduza pela data, pelo espaço e pela visita.
    Se o cliente pediu o valor e você já sabe a quantidade e o dia (ou a data), chame consultar_valor_pacote JÁ e dê o valor NESTA resposta — nunca pergunte "quer que eu te passe o valor?". Com data e horário, a ferramenta confere a agenda: se estiver ocupado, avise e ofereça o horário livre mais próximo.
 2. NUNCA prometa nada: disponibilidade de data, brindes, itens inclusos, exceções. Quem confirma detalhes é a equipe.
-   DEGUSTAÇÃO: só diga se o buffet faz e como funciona o que estiver nas INFORMAÇÕES DO BUFFET; se não estiver, diga que a equipe confirma. Você NUNCA marca degustação nem diz dia ou horário para ela — quem agenda é a equipe. Se oferecer ou marcar VISITA logo depois de o cliente falar de degustação, deixe claro que é uma visita para conhecer o espaço, não a degustação.
+   DEGUSTAÇÃO: só diga se o buffet faz e como funciona o que estiver nas INFORMAÇÕES DO BUFFET; se não estiver, diga que a equipe confirma. Você NUNCA marca degustação nem diz, sugere ou oferece dia ou horário para ela — quem agenda é a equipe, então só diga que a equipe combina o dia com o cliente. Se oferecer ou marcar VISITA logo depois de o cliente falar de degustação, deixe claro que é uma visita para conhecer o espaço, não a degustação.
 3. NUNCA invente informações. Se não souber responder, use a ferramenta transferir_para_atendente.
 4. Se a pessoa pedir para falar com um humano/atendente, ou demonstrar irritação, use transferir_para_atendente imediatamente.
 5. Não diga que você é uma IA a menos que perguntem diretamente; se perguntarem, admita com naturalidade.
@@ -764,7 +764,9 @@ AGENDAMENTO DE VISITAS:
 - QUANDO O CLIENTE PODE: se, depois de um convite de visita, ele disser quando consegue ("só à noite", "eu trabalho durante o dia", "só no fim de semana"), isso é sobre a VISITA (não sobre o horário da festa). Ofereça na mesma resposta 2 horários da lista que encaixam, com dia e hora. Se nenhum encaixa (ex.: ele quer à noite e as visitas vão só até a tarde), diga com gentileza quais são as janelas de visita e ofereça a opção mais próxima do que ele pediu (ex.: sábado de manhã). Nunca ofereça horário de visita fora das janelas nem escreva só "à noite"/"de manhã" sem a hora, e termine com uma pergunta para ele escolher.
 - Quando a pessoa confirmar dia e horário, use agendar_visita. Depois confirme por mensagem o dia/horário e diga que a equipe confirma a visita.
 
-PASSAGEM PARA A EQUIPE: ao usar transferir_para_atendente, avise o cliente que um atendente vai continuar por aqui, sem escrever horários — o sistema acrescenta o horário de atendimento da equipe (veja SITUAÇÃO DESTA CONVERSA). As janelas de visita NÃO são o horário de atendimento da equipe: nunca use uma no lugar da outra.
+REGRAS INTERNAS FICAM INTERNAS: as INFORMAÇÕES DO BUFFET trazem orientações para você (para quem oferecer algo, quando passar para a equipe, critérios). Siga, mas NUNCA repita esses critérios ao cliente (ex.: "não é aberta a todos", "só para quem tem interesse real em fechar") — fale só o que ele precisa saber, com simpatia.
+O QUE SÓ A EQUIPE FAZ: nunca diga que você marcou, agendou, reservou, garantiu, "deixou adiantado" ou "já combinou" algo que só a equipe faz (degustação, data da festa, condições, desconto). Diga que a equipe vai combinar isso com o cliente (ex.: "a equipe combina com você o dia da degustação"). Você só confirma o que fez de verdade com uma ferramenta (ex.: visita agendada com agendar_visita).
+PASSAGEM PARA A EQUIPE: se disser ao cliente que um atendente ou a equipe vai seguir/continuar com ele, use transferir_para_atendente na mesma resposta — nunca prometa sem passar. Ao usar transferir_para_atendente, avise o cliente que um atendente vai continuar por aqui, sem escrever horários — o sistema acrescenta o horário de atendimento da equipe (veja SITUAÇÃO DESTA CONVERSA). As janelas de visita NÃO são o horário de atendimento da equipe: nunca use uma no lugar da outra.
 ${settings.extra_instructions ? `\nINFORMAÇÕES DO BUFFET (fonte única para fatos sobre o buffet; instruções de estilo/personalidade que estiverem aqui devem ser seguidas):\n${settings.extra_instructions}` : ''}${ctx.ownerNotesText ? `\n\nO QUE O DONO DO BUFFET TE ENSINOU (correções e orientações dele — siga sempre; valem mais que as INFORMAÇÕES DO BUFFET, os cadastros de pacotes e as regras de estilo acima; se uma delas contradisser outra, vale a mais recente, que é a de baixo. Só NÃO valem acima das REGRAS INEGOCIÁVEIS: valores só da ferramenta, nada de desconto, promessa ou reserva):\n${ctx.ownerNotesText}` : ''}`;
 
   const notes = [
@@ -2603,7 +2605,12 @@ export async function maybeHandleWithAiAgent(
       promoNote: (() => {
         // Promoção do cadastro ainda no prazo: oferecer depois dos valores, lembrar no máximo 1 vez
         const promo = findPromotion(settings.extra_instructions, ymdBR(nowMs));
-        return promo ? promoNote(promo, promoMentions(chatMessages.filter((m) => m.role === 'assistant').map((m) => m.content), promo)) : null;
+        if (!promo) return null;
+        // Claudia (27/10): festa em 2027 e a IA ofereceu 4x a promoção "para festas em 2026"
+        const cbd = (conv.bot_data || {}) as Json;
+        const partyYear = partyYearOf(cbd.data_festa, cbd.mes, ymdBR(nowMs));
+        if (!promoFitsParty(promo, partyYear)) return promoOffNote(promo, partyYear as number);
+        return promoNote(promo, promoMentions(chatMessages.filter((m) => m.role === 'assistant').map((m) => m.content), promo));
       })(),
       visitSlotsText: visitSlotsByDay(available)
         .map((d) => `${formatDateLong(d.date)}: ${d.times.map((t) => (t.endsWith(':00') ? `${Number(t.slice(0, 2))}h` : t.replace(':', 'h'))).join(', ')}`)
@@ -2784,6 +2791,14 @@ export async function maybeHandleWithAiAgent(
         // Insistiu em não passar: o sistema passa (o horário da equipe vai junto, logo abaixo)
         console.warn(`[AI Agent] Permuta/parceria passada para a equipe pelo sistema (conv ${conv.id})`);
         const motivo = 'proposta de permuta/parceria (a IA não passou sozinha)';
+        const result = await toolTransferir(supabase, instance, conv, phone, contactName, settings, motivo);
+        sandbox?.state.tools.push({ name: 'transferir_para_atendente', args: { motivo }, result });
+      }
+      // Prometeu que a equipe vai seguir e não passou: o sistema passa, para a
+      // promessa valer (e os lembretes automáticos pararem)
+      if (promisesTeamHandoff(finalText) && !conv.__handoffThisTurn && conv.bot_step !== 'human_takeover') {
+        console.warn(`[AI Agent] IA prometeu passar para a equipe sem transferir — sistema passou (conv ${conv.id})`);
+        const motivo = `a IA disse ao cliente que a equipe vai seguir — veja o pedido: "${lastUserText.slice(0, 160)}"`;
         const result = await toolTransferir(supabase, instance, conv, phone, contactName, settings, motivo);
         sandbox?.state.tools.push({ name: 'transferir_para_atendente', args: { motivo }, result });
       }

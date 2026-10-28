@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/assert_equals.ts";
-import { findPromotion, promoCountdown, promoMentions, promoNote } from "./promo.ts";
+import { findPromotion, partyYearOf, promoCountdown, promoFitsParty, promoMentions, promoNote, promoOffNote } from "./promo.ts";
 
 const CADASTRO = [
   "Regras e o que não fazemos: ... EXCEÇÃO: a promoção vigente descrita em \"Outras informações\" é pública (até 30/12).",
@@ -30,4 +30,22 @@ Deno.test("promoMentions e promoNote: oferece, lembra uma vez e para", () => {
   assertEquals(promoNote(p, 0).includes("Só para festas em 2026"), true);
   assertEquals(promoNote(p, 1).includes("MAIS UMA vez"), true);
   assertEquals(promoNote(p, 2).includes("não fale mais dela"), true);
+});
+
+Deno.test("partyYearOf: data exata, mês com ano e mês que já passou = ano que vem", () => {
+  assertEquals(partyYearOf("2027-02-17", "Fevereiro", "2026-10-28"), 2027);
+  assertEquals(partyYearOf(null, "Fevereiro", "2026-10-28"), 2027);
+  assertEquals(partyYearOf(null, "fevereiro/27", "2026-10-28"), 2027);
+  assertEquals(partyYearOf(null, "Dezembro", "2026-10-28"), 2026);
+  assertEquals(partyYearOf(null, "Outubro", "2026-10-28"), 2026);
+  assertEquals(partyYearOf(null, null, "2026-10-28"), null);
+});
+
+Deno.test("promoFitsParty: Claudia, festa em 2027, não recebe a promoção de 2026", () => {
+  const p = findPromotion(CADASTRO, "2026-10-07")!;
+  assertEquals(promoFitsParty(p, 2027), false);
+  assertEquals(promoFitsParty(p, 2026), true);
+  assertEquals(promoFitsParty(p, null), true); // ano da festa ainda não sabido
+  assertEquals(promoFitsParty({ ...p, partyYear: null }, 2027), true); // promoção sem ano
+  assertEquals(promoOffNote(p, 2027).includes("NÃO fale dessa promoção"), true);
 });
