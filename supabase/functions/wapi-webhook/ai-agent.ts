@@ -42,6 +42,7 @@ import { findPromotion, promoMentions, promoNote } from "../_shared/promo.ts";
 import { campaignPromptNote, loadCampaignContext } from "../_shared/campaign-context.ts";
 import { closedPeriodAt, closedPeriodsNote, formatClosedPeriod, isClosedDay, parseClosedPeriods } from "../_shared/closed-periods.ts";
 import { dayWithArticle, nearestAlternativeDays, partyDateFreeNote, partyDateTakenMessage } from "../_shared/party-date-check.ts";
+import { parseSlotPriority, priorityAlternatives, priorityMonthDates } from "../_shared/slot-priority.ts";
 import { birthdayFlavored, corporateCaptions, corporateLeadNote, corporatePromptBlock, mentionsCorporate } from "../_shared/corporate-event.ts";
 import { AI_INBOUND_LAG_MS, asksPartnership, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
 import { firstNameOrEmpty, sendQualificationMaterials } from "./qualification-materials.ts";
@@ -106,6 +107,9 @@ interface AiSettings {
   // intervalo). Vazio = usa o horário de visitas.
   team_hours?: string | null;
   party_slots?: string | null;
+  // Ordem de venda dos horários (do que mais vende ao que menos vende): com
+  // ela, as alternativas começam pelos horários que menos vendem
+  slot_priority?: unknown;
   // Alerta forte quando a equipe não responde depois da passagem
   handoff_alert_minutes?: number | null;
   handoff_alert_phone?: string | null;
@@ -1555,7 +1559,8 @@ async function checkPartyDate(supabase: any, instance: AgentInstance, settings: 
   const recess = !!closedPeriodAt(ymd, parseClosedPeriods(settings.closed_periods));
   const blocks = agenda.perUnit
     .map(({ unit, free }) => {
-      const days = nearestAlternativeDays(free, ymd, 3);
+      const prio = parseSlotPriority(settings.slot_priority);
+      const days = prio ? priorityAlternatives(free, ymd, prio) : nearestAlternativeDays(free, ymd, 3);
       if (days.length === 0) return null;
       return `${agenda.perUnit.length > 1 ? `*Unidade ${unit}*\n` : ''}${daysBlock(days)}`;
     })
@@ -1634,13 +1639,17 @@ async function toolConsultarDatas(
     const label = perUnit.length > 1 ? `Unidade ${unit}: ` : '';
     if (askedDate) {
       const onDay = pickPartyDates(free.filter((f) => f.date === askedDate), [], 1);
-      const others = pickPartyDates(free.filter((f) => f.date !== askedDate), [weekdayOf(askedDate)], 3);
+      const prio = parseSlotPriority(settings.slot_priority);
+      const others = prio
+        ? priorityAlternatives(free, askedDate, prio)
+        : pickPartyDates(free.filter((f) => f.date !== askedDate), [weekdayOf(askedDate)], 3);
       const recess = closedPeriodAt(askedDate, parseClosedPeriods(settings.closed_periods));
       blocks.push(onDay.length > 0
         ? `${label}${formatDateLong(askedDate)} — disponível neste momento. Linhas prontas:\n${daysBlock(onDay)}\n${toolRefs(onDay)}`
         : `${label}${formatDateLong(askedDate)} ${recess ? `cai no RECESSO do buffet (fechado ${formatClosedPeriod(recess, today)}, sem festas) — explique isso com gentileza.` : 'está OCUPADO.'} Datas próximas disponíveis neste momento — linhas prontas:\n${others.length > 0 ? `${daysBlock(others)}\n${toolRefs(others)}` : '(nenhuma nas semanas próximas — passe para a equipe)'}`);
     } else {
-      const days = pickPartyDates(free, preferredDows, 3);
+      const prio = parseSlotPriority(settings.slot_priority);
+      const days = prio ? priorityMonthDates(free, preferredDows, prio, 3) : pickPartyDates(free, preferredDows, 3);
       blocks.push(days.length > 0
         ? `${label}Datas disponíveis neste momento (no máximo estas) — linhas prontas:\n${daysBlock(days)}\n${toolRefs(days)}${preferredDows.length > 0 && !days.some((d) => preferredDows.includes(d.dow)) ? '\n(nenhuma data no dia preferido nesse mês — diga isso e ofereça estas)' : ''}`
         : `${label}Nenhum horário livre nesse período — ofereça outro mês ou passe para a equipe.`);
@@ -1733,10 +1742,14 @@ async function toolConsultarValor(
       // outro horário do mesmo dia (achado do simulador).
       const sameDow = free.filter((f) => f.date > today && f.date !== date && weekdayOf(f.date) === weekdayOf(date));
       const sameHour = isNaN(wantHour) ? sameDow : sameDow.filter((f) => Number(f.slot.start.slice(0, 2)) === wantHour);
-      const others = pickPartyDates(sameHour.length > 0 ? sameHour : sameDow, [], 3);
+      const prio = parseSlotPriority(settings.slot_priority);
+      const others = prio
+        ? priorityAlternatives(free.filter((f) => f.date > today), date, prio, { wantStart: isNaN(wantHour) ? null : `${String(wantHour).padStart(2, '0')}:00`, max: onDay.length > 0 ? 2 : 3 })
+        : pickPartyDates(sameHour.length > 0 ? sameHour : sameDow, [], 3);
+      // Com a ordem de venda, mantém os que menos vendem na frente
       const nearest = [...(onDay.length > 0 ? pickPartyDates(onDay, [], 1) : []), ...others]
         .slice(0, 3)
-        .sort((x, y) => x.date.localeCompare(y.date));
+        .sort((x, y) => (prio ? 0 : x.date.localeCompare(y.date)));
       const recess = closedPeriodAt(date, parseClosedPeriods(settings.closed_periods));
       const what = recess
         ? `${fmtDateBR(date)} cai no RECESSO do buffet (fechado ${formatClosedPeriod(recess, today)}, sem festas)`
