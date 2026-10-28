@@ -65,10 +65,11 @@ Deno.test("estimateChatCostUsd: aplica o preço de cada tipo de token", () => {
     estimateChatCostUsd("claude-haiku-4-5-20251001", { inputTokens: 1000, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }),
     0.001,
   );
-  // Modelo desconhecido: cobra como o padrão (nunca zera o custo)
+  // Modelo desconhecido: cobra como o padrão, Claude Sonnet 5.5 (nunca zera o custo)
+  // 3000 × $2/M + 100 × $10/M
   assertEquals(
     estimateChatCostUsd("modelo-novo", { inputTokens: 3000, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 100 }),
-    0.00051,
+    0.007,
   );
 });
 

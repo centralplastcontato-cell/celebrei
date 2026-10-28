@@ -131,7 +131,7 @@ export function AiTechSection() {
       <p className="px-1 text-xs text-muted-foreground">Só administradores da Celebrei veem esta página.</p>
 
       <AiCard icon={<Cpu className="h-4 w-4 text-violet-600" />} title="Modelo de IA (clientes)"
-        description="Modelos Claude precisam da chave da Anthropic cadastrada no Supabase; sem ela, a IA usa o GPT-4o mini.">
+        description="Modelos Claude precisam da chave da Anthropic cadastrada no Supabase; sem ela, a IA usa o GPT-5.4.">
         <Select value={d.model} onValueChange={set("model")}>
           <SelectTrigger className="h-auto min-h-10 py-1.5 text-left" aria-label="Modelo de IA"><SelectValue>{modelLabel(d.model)}</SelectValue></SelectTrigger>
           <SelectContent>
