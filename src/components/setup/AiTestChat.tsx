@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileText, Globe, Loader2, MessageCircle, RotateCcw, Send } from "lucide-react";
+import { FileText, Globe, GraduationCap, Loader2, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { upcomingMonthOptions } from "@/lib/partyDate";
+import { AiTeachDialog, type TeachContext } from "./AiTeachDialog";
 
 interface Reply { kind: "text" | "image" | "video" | "document"; text: string; mediaUrl?: string; fileName?: string }
 interface Line { who: "cliente" | "ia" | "aviso"; reply: Reply }
@@ -15,7 +16,15 @@ const SUGGESTIONS = ["Oi, quanto fica uma festa pra 70 pessoas?", "Vocês têm d
  * "Testar a minha IA": o dono conversa como se fosse um cliente. A IA responde no
  * modo isolado (ai-simulator, action "chat"): nada vai para o WhatsApp nem fica gravado.
  */
-export function AiTestChat({ open, onOpenChange, companyId }: { open: boolean; onOpenChange: (v: boolean) => void; companyId: string }) {
+export function AiTestChat({ open, onOpenChange, companyId, canTeach = false, onTaught }: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  companyId: string;
+  /** mostra "Corrigir" embaixo das respostas da IA (quem gerencia o buffet) */
+  canTeach?: boolean;
+  onTaught?: () => void;
+}) {
+  const [teach, setTeach] = useState<TeachContext | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [state, setState] = useState<unknown>(null);
   const [text, setText] = useState("");
@@ -135,6 +144,15 @@ export function AiTestChat({ open, onOpenChange, companyId }: { open: boolean; o
                     </a>
                   )}
                   {l.reply.text}
+                  {canTeach && l.who === "ia" && l.reply.text.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setTeach({ cliente: [...lines.slice(0, i)].reverse().find((x) => x.who === "cliente")?.reply.text || null, resposta: l.reply.text })}
+                      className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                    >
+                      <GraduationCap className="h-3 w-3" /> Corrigir
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -155,6 +173,7 @@ export function AiTestChat({ open, onOpenChange, companyId }: { open: boolean; o
           </div>
         </div>
       </DialogContent>
+      <AiTeachDialog open={!!teach} onOpenChange={(v) => !v && setTeach(null)} companyId={companyId} context={teach} onSaved={onTaught} />
     </Dialog>
   );
 }
