@@ -115,6 +115,17 @@ async function syncGeneralScenarios(): Promise<void> {
   }
 }
 
+// Número usado no teste: o que a IA atende ou, se o buffet ainda não escolheu,
+// o número do próprio buffet (o teste não manda nada pelo WhatsApp). Antes o
+// teste travava em "Responda as perguntas da IA" mesmo com tudo preenchido
+// (Rodrigo, Mega Magic 28/10: só faltava escolher o número).
+async function testUnit(companyId: string, settings: any): Promise<string | null> {
+  if (settings?.unit) return String(settings.unit);
+  const { data } = await admin.from("wapi_instances").select("unit, status").eq("company_id", companyId);
+  const list = ((data || []) as Array<{ unit: string | null; status: string | null }>).filter((i) => i.unit);
+  return (list.find((i) => i.status === "connected") || list[0])?.unit || null;
+}
+
 async function start(req: Request, body: any): Promise<Response> {
   const companyId = String(body.company_id || "");
   if (!companyId) return json({ error: "company_id obrigatório" }, 400);
@@ -122,7 +133,8 @@ async function start(req: Request, body: any): Promise<Response> {
   if (auth instanceof Response) return auth;
 
   const { data: settings } = await admin.from("ai_agent_settings").select("*").eq("company_id", companyId).maybeSingle();
-  if (!settings?.unit) return json({ error: "Configure a IA (unidade) antes de rodar os testes" }, 400);
+  if (!settings) return json({ error: "Responda as perguntas da IA antes de rodar os testes" }, 400);
+  if (!(await testUnit(companyId, settings))) return json({ error: "Conecte um número de WhatsApp antes de rodar os testes" }, 400);
 
   // Uma rodada por vez por empresa
   const since = new Date(Date.now() - 30 * 60000).toISOString();
@@ -190,7 +202,9 @@ async function chat(req: Request, body: any): Promise<Response> {
     if (isAdmin !== true) return json({ error: "Só o dono do buffet pode testar a IA" }, 403);
   }
   const { data: settings } = await admin.from("ai_agent_settings").select("*").eq("company_id", companyId).maybeSingle();
-  if (!settings?.unit) return json({ error: "Responda as perguntas da IA antes de testar" }, 400);
+  if (!settings) return json({ error: "Responda as perguntas da IA antes de testar" }, 400);
+  const unit = await testUnit(companyId, settings);
+  if (!unit) return json({ error: "Conecte um número de WhatsApp antes de testar a IA" }, 400);
 
   let state = body.state && typeof body.state === "object" && body.state.sandbox ? body.state as ScenarioState : null;
   if (!state) {
@@ -221,7 +235,7 @@ async function chat(req: Request, body: any): Promise<Response> {
   if (state.turn >= CHAT_MAX_TURNS) return json({ error: `O teste vai até ${CHAT_MAX_TURNS} mensagens. Toque em "Começar de novo".` }, 400);
 
   const model = (settings.test_mode_enabled && settings.test_model) || settings.model || DEFAULT_AI_MODEL;
-  const r = await runChatTurn({ realDb: aiReadDb, companyId, unit: settings.unit, model, state, message });
+  const r = await runChatTurn({ realDb: aiReadDb, companyId, unit, model, state, message });
   return json({ state: r.state, replies: r.replies, handoff: r.handoff, left: CHAT_MAX_TURNS - r.state.turn });
 }
 
@@ -349,7 +363,7 @@ async function work(runId: string): Promise<void> {
       realDb: aiReadDb,
       companyId,
       companyName: company?.name || "Buffet",
-      unit: settings?.unit || "",
+      unit: (await testUnit(companyId, settings)) || "",
       model: run.model || null,
       scenario,
       state: sim,
