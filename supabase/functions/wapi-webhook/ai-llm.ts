@@ -52,7 +52,10 @@ export interface LlmSession {
 
 export interface LlmSessionInput {
   model: string;
+  /** Instruções; com systemDynamic, só a parte igual para todas as conversas (vai para o cache) */
   system: string;
+  /** Parte que muda a cada conversa/mensagem: vem depois e fora do cache */
+  systemDynamic?: string;
   history: ChatTurn[];
   tools: ToolDef[];
   openaiKey: string | null;
@@ -73,7 +76,9 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
 class OpenAiSession implements LlmSession {
   private messages: Array<Record<string, unknown>>;
   constructor(private input: LlmSessionInput & { openaiKey: string }) {
-    this.messages = [{ role: "system", content: input.system }, ...input.history];
+    // A OpenAI aproveita sozinha o começo igual entre chamadas: a parte fixa vem primeiro
+    const system = input.systemDynamic ? `${input.system}\n\n${input.systemDynamic}` : input.system;
+    this.messages = [{ role: "system", content: system }, ...input.history];
   }
 
   async step(): Promise<LlmStep> {
@@ -160,7 +165,14 @@ class AnthropicSession implements LlmSession {
       model,
       // Inclui o "pensamento" interno; o tamanho da resposta é controlado pelo prompt
       max_tokens: withEffort ? 4000 : 1024,
-      system: [{ type: "text", text: this.input.system, cache_control: { type: "ephemeral" } }],
+      // Parte fixa no cache de 1 hora (as regras e as informações do buffet são
+      // iguais para todos os clientes); a parte da conversa vem depois, fora dele
+      system: this.input.systemDynamic
+        ? [
+          { type: "text", text: this.input.system, cache_control: { type: "ephemeral", ttl: "1h" } },
+          { type: "text", text: this.input.systemDynamic },
+        ]
+        : [{ type: "text", text: this.input.system, cache_control: { type: "ephemeral" } }],
       messages: this.messages,
       ...(this.tools.length > 0 ? { tools: this.tools } : {}),
     };
