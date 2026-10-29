@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 const TAB_GROUPS = [
   { key: "todos", label: "Todos", types: null },
   { key: "visitas", label: "Visitas", types: ["visit_scheduled"] },
-  { key: "clientes", label: "Clientes", types: ["existing_client", "party_soon", "client_data"] },
+  { key: "clientes", label: "Clientes", types: ["existing_client", "party_soon", "client_data", "vamu_order"] },
   { key: "transferencias", label: "Transf.", types: ["lead_transfer", "lead_assigned"] },
   { key: "outros", label: "Outros", types: ["lead_questions", "lead_analyzing", "follow_up_sent", "lead_lost", "stale_reminded", "lead_risk", "message_stuck", "lead_needs_human", "new_candidate", "delivery_stall", "contact_stop_request"] },
 ] as const;
