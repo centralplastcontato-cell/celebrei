@@ -15,6 +15,7 @@ import { decideDeliveryStall, type OutgoingRow, STALL_LOOKBACK_MS } from "../_sh
 import { LOST_RESEND_AFTER_MS, LOST_RESEND_MAX_AGE_MS, LOST_RESEND_SOURCES, shouldResendLost } from "../_shared/lost-first-message.ts";
 import { isAiConversationalEnabled } from "../_shared/ai-module.ts";
 import { evolutionSendMedia, evolutionSendText, extractEvolutionMessageId } from "../_shared/evolution.ts";
+import { processAiAutoReturn } from "./ai-auto-return.ts";
 import { type AiTarget, freeSlotsBetween, journeyOwnsConversation, type JourneyScope, journeyScopes, loadAiJourneyTargets, runAiJourney } from "./ai-journey.ts";
 import { firstNameOf, partyYmdFromLead, postVisitDue, postVisitMessage } from "../_shared/post-visit.ts";
 import { mentionsLaterTime, parseReturnJson, RETURN_HOUR, RETURN_STALE_REPLY_MS, returnDue, returnMessage, returnPrompt } from "../_shared/scheduled-return.ts";
@@ -511,6 +512,15 @@ Deno.serve(async (req) => {
           else console.log(`[follow-up-check] 🛡️ Jornada da Bia pulada no número ${t.instance.unit}: ${health.reason}`);
         }
         if (healthy.length === 0) return;
+        // Equipe assumiu e ficou 24 h sem escrever: a conversa volta para a IA
+        // antes da jornada, que já pode mandar o follow-up neste ciclo
+        try {
+          const back = await processAiAutoReturn(supabase, healthy);
+          if (back.returned > 0) console.log(`[follow-up-check] ${back.returned} conversa(s) voltaram para a IA`);
+          if (back.errors.length > 0) console.error("[follow-up-check] Erros na volta da IA:", back.errors);
+        } catch (err) {
+          console.error("[follow-up-check] Erro na volta da IA:", err);
+        }
         const journey = await runAiJourney(supabase, healthy);
         console.log(`[follow-up-check] Jornada da Bia: ${journey.sent} mensagem(ns), ${journey.lost} perdido(s)`);
         if (journey.errors.length > 0) console.error("[follow-up-check] Erros na jornada da Bia:", journey.errors);

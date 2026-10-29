@@ -130,6 +130,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { 
   Send, Search, MessageSquare, Check, CheckCheck, Clock, WifiOff, RefreshCw, AlertCircle, 
   ArrowLeft, Building2, Star, StarOff, Link2, FileText, Smile,
@@ -3174,8 +3175,17 @@ export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConver
   };
 
   // Auto-disable bot when human sends ANY message (text, media, audio, contact)
-  const autoDisableBotOnHumanSend = (conv: { id: string; bot_enabled: boolean | null } | null) => {
+  const autoDisableBotOnHumanSend = (conv: Conversation | null) => {
     if (!conv || !conv.bot_enabled) return;
+    // Conversa da IA: ela sai agora; lembra a equipe de devolver (ou ela volta sozinha em 24 h)
+    if (aiConversationState(conv) === 'atendendo') {
+      toast({
+        title: "Você assumiu a conversa da IA",
+        description: "Ela parou de responder e de mandar follow-ups. Terminou? Devolva para ela. Se ficar 24 h sem mensagem da equipe, ela volta sozinha (menos em negociação, visita ou fechado).",
+        duration: 12000,
+        action: <ToastAction altText="Devolver para a IA" onClick={() => void returnToBia(conv)}>Devolver para a IA</ToastAction>,
+      });
+    }
     supabase
       .from("wapi_conversations")
       .update({ bot_enabled: false, bot_step: 'human_takeover' })
@@ -3713,7 +3723,7 @@ export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConver
     }
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, bot_enabled: false, bot_step: 'human_takeover' } : c));
     setSelectedConversation(prev => prev && prev.id === conv.id ? { ...prev, bot_enabled: false, bot_step: 'human_takeover' } : prev);
-    toast({ title: "Você assumiu a conversa", description: "A IA parou de responder e de mandar follow-ups para este cliente." });
+    toast({ title: "Você assumiu a conversa", description: "A IA parou de responder e de mandar follow-ups para este cliente. Se ficar 24 h sem mensagem da equipe, ela volta sozinha (menos em negociação, visita ou fechado)." });
   };
 
   // "Não precisa responder": some a etiqueta Responder sem mandar nada ao cliente
