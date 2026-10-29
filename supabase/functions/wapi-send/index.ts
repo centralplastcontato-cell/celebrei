@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { isConversationPaused } from "../_shared/bot-loop-guard.ts";
 import { mediaAckMetadata } from "../_shared/media-ack.ts";
+import { zapiLinkBody } from "../_shared/link-preview.ts";
 import { EVOLUTION_WEBHOOK_EVENTS, isHeldError, evolutionDownloadMedia, evolutionReact, evolutionRequest, evolutionStatus, type EvolutionQuoted, evolutionSendMedia, evolutionSendText, extractEvolutionMessageId } from "../_shared/evolution.ts";
 import { decryptWhatsAppMedia, encryptedMediaUrl, type WaMediaType } from "../_shared/whatsapp-media-crypto.ts";
 import { classifyEvolutionStatus, skipLoggedOutCheck } from "../_shared/evolution-health.ts";
@@ -480,6 +481,19 @@ async function zapiReinforceNotifySentByMe(instanceId: string, token: string, cl
 // Z-API send text. When messageId is present, Z-API sends a native WhatsApp reply/quote.
 async function zapiSendText(instanceId: string, token: string, clientToken: string | null, rawPhone: string, message: string, quotedProviderMessageId?: string | null, delayTyping?: number): Promise<{ ok: boolean; data?: unknown; error?: string }> {
   const phone = rawPhone.endsWith('@g.us') ? rawPhone : String(rawPhone || '').replace(/\D/g, '');
+  // Link de formulário/contrato: vai com prévia (imagem e nome do buffet); se a Z-API recusar, segue como texto
+  if (!quotedProviderMessageId) {
+    const linkBody = await zapiLinkBody(phone, message);
+    if (linkBody) {
+      const res = await zapiRequest(instanceId, token, clientToken, 'send-link', 'POST', linkBody);
+      if (res.ok) {
+        console.log(`[Z-API] send-link success to ${phone}`);
+        waitUntil(zapiReinforceNotifySentByMe(instanceId, token, clientToken, 'after-send-text'));
+        return res;
+      }
+      console.warn(`[Z-API] send-link falhou (${res.error}) — enviando como texto`);
+    }
+  }
   const payload: Record<string, unknown> = { phone, message };
   if (quotedProviderMessageId) payload.messageId = quotedProviderMessageId;
   // "digitando..." no WhatsApp do cliente por N segundos antes da mensagem (Z-API: 1 a 15)

@@ -1,3 +1,5 @@
+import { linkPreviewText } from "./link-preview.ts";
+export { linkPreviewText };
 // Evolution Go (whatsmeow) — terceiro provedor de WhatsApp, ao lado da W-API e
 // da Z-API (wapi_instances.provider = 'evolution').
 //
@@ -134,28 +136,6 @@ export function extractEvolutionMessageId(payload: unknown): string | null {
 export interface EvolutionQuoted {
   messageId: string;
   participant: string;
-}
-
-// Links dos formulários e do contrato: vão com prévia (imagem e nome do buffet),
-// como no app. Outros links seguem como texto simples.
-const PREVIEW_PATH = /\/(dados|dados-contratante|assinar-contrato|avaliacao|pre-festa|prefesta|contrato)\//i;
-
-/**
- * Texto com o 1º link de formulário já com "https://" (a Evolution só monta a
- * prévia com o endereço completo). null = sem link que mereça prévia.
- */
-export function linkPreviewText(text: string): string | null {
-  const re = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s]*/gi;
-  for (const m of text.matchAll(re)) {
-    const raw = m[0];
-    if (!PREVIEW_PATH.test(raw)) continue;
-    if (/^https?:\/\//i.test(raw)) return text;
-    const at = m.index ?? 0;
-    // "e-mail@buffet.com.br/x" ou parte de outra palavra: não é link
-    if (at > 0 && /[\w@.-]/.test(text[at - 1])) continue;
-    return text.slice(0, at) + "https://" + raw + text.slice(at + raw.length);
-  }
-  return null;
 }
 
 export async function evolutionSendText(token: string, to: string, text: string, quoted?: EvolutionQuoted | null): Promise<EvolutionResult> {

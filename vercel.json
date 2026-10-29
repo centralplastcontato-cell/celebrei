@@ -17,6 +17,90 @@
       "permanent": false
     },
     {
+      "source": "/dados/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/dados/:token",
+      "permanent": false
+    },
+    {
+      "source": "/dados-contratante/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/dados-contratante/:token",
+      "permanent": false
+    },
+    {
+      "source": "/assinar-contrato/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/assinar-contrato/:token",
+      "permanent": false
+    },
+    {
+      "source": "/avaliacao/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/avaliacao/:rest*",
+      "permanent": false
+    },
+    {
+      "source": "/pre-festa/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/pre-festa/:rest*",
+      "permanent": false
+    },
+    {
+      "source": "/prefesta/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/prefesta/:rest*",
+      "permanent": false
+    },
+    {
+      "source": "/contrato/:rest*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|Slack-ImgProxy|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Embedly|SkypeUriPreview|Applebot|W3C_Validator|Go-http-client).*"
+        }
+      ],
+      "destination": "/api/og?path=/contrato/:rest*",
+      "permanent": false
+    },
+    {
       "source": "/para-buffets",
       "destination": "/",
       "permanent": false
@@ -25,34 +109,59 @@
   "rewrites": [
     {
       "source": "/brand-icon.png",
-      "has": [{ "type": "host", "value": "(www\\.)?castelodadiversao\\.online" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?castelodadiversao\\.online"
+        }
+      ],
       "destination": "/favicon-castelo.png"
     },
-    { "source": "/brand-icon.png", "destination": "/favicon.png" },
+    {
+      "source": "/brand-icon.png",
+      "destination": "/favicon.png"
+    },
     {
       "source": "/empresas",
-      "has": [{ "type": "host", "value": "(www\\.)?castelodadiversao\\.(com\\.br|online)" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?castelodadiversao\\.(com\\.br|online)"
+        }
+      ],
       "destination": "/empresas.html"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     }
   ]
