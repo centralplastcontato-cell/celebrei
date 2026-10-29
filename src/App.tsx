@@ -10,6 +10,7 @@ import { LoadingScreen } from "@/components/ui/loading-screen";
 
 // Eager: root-level routing (tiny, always needed)
 import RootPage from "./pages/RootPage";
+import { AppStartRedirect } from "./components/AppStartRedirect";
 import { isPreviewDomain, getCanonicalHost } from "@/hooks/useDomainDetection";
 import { SetupGate } from "@/components/SetupGate";
 import NotFound from "./pages/NotFound";
@@ -182,6 +183,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <SetupGate />
+          <AppStartRedirect />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<RootPage />} />
