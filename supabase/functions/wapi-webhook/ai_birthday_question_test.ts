@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/assert_equals.ts";
-import { birthdayQuestionDue } from "./ai-agent.ts";
+import { birthdayQuestionDue } from "./ai-birthday.ts";
 
 Deno.test("aniversariante: pergunta na conversa de festa enquanto não souber", () => {
   // Vitor (29/10): "Aniversário" → a próxima mensagem já pergunta de quem é a festa

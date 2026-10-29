@@ -46,6 +46,7 @@ import { parseSlotPriority, priorityAlternatives, priorityMonthDates } from "../
 import { birthdayFlavored, corporateCaptions, corporateLeadNote, corporatePromptBlock, mentionsCorporate } from "../_shared/corporate-event.ts";
 import { AI_INBOUND_LAG_MS, asksPartnership, promisesTeamHandoff, clientAffirms, clientAskedPrice, PRICE_ASK_WINDOW_MS, askPartyDayAfterMaterials, closingAfterMaterials, needsPartyDay, visitInviteAfterMaterials, confirmsPartyInterest, contactIntent, clientAsksVisit, clientDeclined, crossedWithLastReply, dayPreferenceFrom, debounceMsFor, dropMaterialsBreak, mergeConsecutiveTurns, pickLatestIncoming, priceRequestPending, repliesSinceVisitInvite, smallestPackageGuests, splitAroundMaterials, stripVisitInvite, teamRepliedAfter } from "../_shared/ai-turn.ts";
 import { firstNameOrEmpty, sendQualificationMaterials } from "./qualification-materials.ts";
+import { birthdayQuestionDue } from "./ai-birthday.ts";
 import { askedForName, nameFromAnswer } from "../_shared/name-answer.ts";
 import { falseMaterialClaims, hasMaterialClaim, hasSubstance, refersToMaterial, stripFalseMaterialClaims } from "../_shared/material-claims.ts";
 import { enforceHouseRules, houseRuleNote, houseRuleViolatingSentences, houseRuleViolations, parseHouseRules, topicsAsked, TOPIC_ASK } from "../_shared/house-rules.ts";
@@ -631,19 +632,6 @@ function visitInviteRule(repliesAgo: number | null, clientAffirmed = false): str
 interface SystemPromptParts {
   stable: string;
   dynamic: string;
-}
-
-/**
- * Vitor (29/10): a IA foi de nome → mês → convidados → materiais e nunca
- * perguntou de quem era a festa. Na conversa de festa, sem aniversariante
- * registrado e sem ter perguntado ainda, a próxima mensagem pergunta.
- */
-export function birthdayQuestionDue(bd: Json, lastUserText: string, assistantTexts: string[]): boolean {
-  if (bd.tipo_evento === 'empresa' || firstNameOrEmpty(bd.aniversariante as string)) return false;
-  if (!bd.mes && !bd.convidados && !/anivers/i.test(lastUserText || '')) return false;
-  // Só a pergunta em si: a legenda das fotos fala da "carinha de quem faz aniversário" e não conta
-  const asked = /de quem (é|e|vai ser) a festa|nome d[oa] (criança|aniversariante)|quem (é|vai ser) [oa] aniversariante/i;
-  return !assistantTexts.some((t) => asked.test(String(t || '')));
 }
 
 function buildSystemPrompt(companyName: string, unit: string, settings: AiSettings, today: string, ctx: PromptContext): SystemPromptParts {
