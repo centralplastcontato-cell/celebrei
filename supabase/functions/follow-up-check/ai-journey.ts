@@ -62,10 +62,15 @@ async function loadJourneyMessages(supabase: Db, conv: Json): Promise<{ history:
     // Mensagens automáticas que não são da Bia (follow-up fixo, reativação, confirmação de visita, avisos): nem âncora nem bloqueio
     return !OTHER_AUTOMATED_SOURCES.has(String((m.metadata as Json | null)?.source || ""));
   });
+  // Devolvida para a IA (botão ou volta automática): o que a equipe escreveu
+  // antes disso faz parte da conversa da IA e não trava os follow-ups dela
+  const returnedAtMs = typeof bd.ai_returned_at === "string" ? Date.parse(bd.ai_returned_at) : NaN;
   const msgs: JourneyMessage[] = history.map((m) => ({
     atMs: Date.parse(m.timestamp),
     fromMe: m.from_me === true,
-    byAi: m.from_me === true ? (m.metadata as Json | null)?.source === "ai_agent" : undefined,
+    byAi: m.from_me === true
+      ? (m.metadata as Json | null)?.source === "ai_agent" || Date.parse(m.timestamp) <= returnedAtMs
+      : undefined,
     isMedia: !!m.message_type && m.message_type !== "text",
     text: String(m.content || ""),
     followup: (m.metadata as Json | null)?.ai_followup || null,
