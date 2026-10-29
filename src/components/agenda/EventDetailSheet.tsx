@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Clock, Users, MapPin, Package, DollarSign, Pencil, Trash2, AlertTriangle, UserCheck, Gamepad2, Copy, Check, ExternalLink, Briefcase, CalendarIcon, Loader2, CreditCard, MessageCircle, FileSignature, ChevronRight } from "lucide-react";
+import { X, Clock, Users, MapPin, Package, DollarSign, Pencil, Trash2, AlertTriangle, UserCheck, Gamepad2, Gift, Copy, Check, ExternalLink, Briefcase, CalendarIcon, Loader2, CreditCard, MessageCircle, FileSignature, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ContractReadinessPanel } from "@/components/contracts/ContractReadinessPanel";
 import { EventContractDialog } from "@/components/contracts/EventContractDialog";
@@ -24,6 +24,7 @@ import { useFinancialPermissions } from "@/hooks/useFinancialPermissions";
 import { useFinancialConsent } from "@/hooks/useFinancialConsent";
 
 import { cn } from "@/lib/utils";
+import { vamuPartyLink } from "../../../supabase/functions/_shared/vamu.ts";
 import { toast } from "@/hooks/use-toast";
 
 interface TeamMember {
@@ -245,6 +246,22 @@ export function EventDetailSheet({ open, onOpenChange, event, onEdit, onDelete, 
   }, [event?.data_fechamento_venda, event?.vendedor_responsavel_id, event?.id]);
 
   const getControlUrl = () => `${window.location.origin}/festa/${event?.id}`;
+
+  // Lembrancinhas Vamu 3D (empresa com companies.settings.vamu3d = true):
+  // link da página da Vamu já com o nome, a idade e a data da festa
+  const [vamuEnabled, setVamuEnabled] = useState(false);
+  const [vamuCopied, setVamuCopied] = useState(false);
+  useEffect(() => {
+    if (!event?.company_id) { setVamuEnabled(false); return; }
+    supabase.from("companies").select("settings").eq("id", event.company_id).maybeSingle()
+      .then(({ data }) => setVamuEnabled(((data?.settings || {}) as Record<string, unknown>).vamu3d === true));
+  }, [event?.company_id]);
+  const vamuUrl = event ? vamuPartyLink({ id: event.id, child_name: event.child_name, child_age: event.child_age, event_date: event.event_date }) : "";
+  const handleCopyVamuLink = () => {
+    navigator.clipboard.writeText(vamuUrl);
+    setVamuCopied(true);
+    setTimeout(() => setVamuCopied(false), 2000);
+  };
 
   const handleCopyControlLink = () => {
     navigator.clipboard.writeText(getControlUrl());
@@ -735,6 +752,45 @@ export function EventDetailSheet({ open, onOpenChange, event, onEdit, onDelete, 
 
 
 
+
+          {vamuEnabled && (
+            <div
+              className="rounded-xl p-3.5 flex items-center gap-3"
+              style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)", border: "1px solid rgba(251,146,60,0.25)" }}
+            >
+              <div
+                className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "linear-gradient(135deg, #f97316, #ea580c)" }}
+              >
+                <Gift className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#fdba74" }}>Lembrancinhas Vamu 3D</p>
+                <p className="text-xs" style={{ color: "#64748b" }}>Link já com o nome, a idade e a data da festa</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => window.open(vamuUrl, "_blank")}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors"
+                  style={{ background: "rgba(251,146,60,0.15)" }}
+                  title="Abrir página da Vamu"
+                >
+                  <ExternalLink className="h-4 w-4" style={{ color: "#fdba74" }} />
+                </button>
+                <button
+                  onClick={handleCopyVamuLink}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center transition-colors"
+                  style={{ background: "rgba(251,146,60,0.15)" }}
+                  title="Copiar link"
+                >
+                  {vamuCopied
+                    ? <Check className="h-4 w-4" style={{ color: "#34d399" }} />
+                    : <Copy className="h-4 w-4" style={{ color: "#fdba74" }} />
+                  }
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Linked Tasks */}
           {userId && event.company_id && (
