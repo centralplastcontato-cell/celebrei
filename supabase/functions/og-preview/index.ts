@@ -228,6 +228,28 @@ async function resolveOnboarding(companySlug: string, baseUrl: string): Promise<
   });
 }
 
+async function resolveClientData(token: string, canonical: string, url: string): Promise<Response | null> {
+  const supabase = getSupabase();
+  const { data: req } = await supabase.from("client_data_requests").select("company_id").eq("token", token).maybeSingle();
+  if (!req?.company_id) return null;
+  const { data: company } = await supabase.from("companies").select("name, logo_url, custom_domain, domain_canonical")
+    .eq("id", req.company_id).maybeSingle();
+  if (!company) return null;
+  // No domínio do próprio buffet, segue a prévia normal dele (imagem já preparada)
+  const own = [company.domain_canonical, canonicalize(String(company.custom_domain || "").replace(/^https?:\/\//i, "").replace(/\/.*$/, ""))]
+    .filter(Boolean) as string[];
+  if (own.some((d) => canonical === d || canonical.endsWith(`.${d}`))) return null;
+  const { data: lp } = await supabase.from("company_landing_pages").select("hero")
+    .eq("company_id", req.company_id).eq("is_published", true).maybeSingle();
+  const hero = lp?.hero as { background_image_url?: string | null } | null;
+  return new Response(buildHTML({
+    title: company.name,
+    description: "Preencha seus dados para o contrato da festa 🎉",
+    image: hero?.background_image_url || company.logo_url || "https://hubcelebrei.com.br/og-para-buffets.jpg",
+    url,
+  }, url), { headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } });
+}
+
 async function resolveByDomain(domain: string, pathname: string): Promise<Response | null> {
   const canonical = canonicalize(domain);
   const baseUrl = domain.includes("localhost") ? `http://${domain}` : `https://${domain}`;
@@ -243,6 +265,14 @@ async function resolveByDomain(domain: string, pathname: string): Promise<Respon
   const maintMatch = pathname.match(/^\/manutencao\/([0-9a-f-]{36})$/i);
   if (maintMatch) {
     const result = await resolveMaintenance(maintMatch[1], baseUrl);
+    if (result) return result;
+  }
+
+  // Link de dados do contratante: a prévia é do buffet DONO do pedido. Sem domínio
+  // próprio, o link sai pelo endereço da Celebrei e mostraria a marca da Celebrei.
+  const dataMatch = pathname.match(/^\/(?:dados|dados-contratante)\/([A-Za-z0-9-]+)\/?$/);
+  if (dataMatch) {
+    const result = await resolveClientData(dataMatch[1], canonical, `${baseUrl}${pathname}`);
     if (result) return result;
   }
 
