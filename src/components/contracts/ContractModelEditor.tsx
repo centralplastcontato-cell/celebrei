@@ -314,11 +314,14 @@ export function ContractModelEditor({ model, userId, onClose }: Props) {
   );
 }
 
-const DEFAULT_TEMPLATE = `FESTA PACOTE CASTELO
-Contrato de Prestação de Serviço de Buffet Infantil
+// Modelo inicial genérico (29/10): antes vinha o contrato do Castelo, com
+// endereço, CNPJ e foro dele — um buffet novo podia mandar com os dados errados.
+// O que é do buffet fica entre [colchetes] para ele preencher.
+const DEFAULT_TEMPLATE = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE BUFFET INFANTIL
 
-O Buffet {{empresa}}, com sede na Avenida General Osório, 1442 – CNPJ 43.883.010.0001/25 denominado CONTRATADO e:
+CONTRATADO: {{empresa}}, inscrito no CNPJ [CNPJ do buffet], com sede em [endereço do buffet].
 
+CONTRATANTE:
 Nome: {{nome_completo}}
 Data de Nascimento: {{data_nascimento}}
 CPF: {{cpf}}
@@ -328,99 +331,36 @@ Complemento: {{complemento}}
 Bairro: {{bairro}}
 CEP: {{cep}}
 Cidade: {{cidade}}
+Telefone: {{telefone}}
 E-mail: {{email}}
 
-**Aniversariante: {{nome_aniversariante}}, Idade a comemorar: {{idade_aniversariante}}, Data Nascimento: {{data_nascimento_aniversariante}}, Data do Evento: {{data_evento}}, Data do Contrato: {{data_contrato}}, Pacote escolhido: {{pacote}}, Tema: {{tema}}, Nome dos pais: {{nomes_pais}}, Telefone dos pais: {{telefone}}, Denominada CONTRATANTE.**
+**Aniversariante: {{nome_aniversariante}}, Idade a comemorar: {{idade_aniversariante}}, Data de nascimento: {{data_nascimento_aniversariante}}
+Data do evento: {{data_evento}}, das {{hora_inicio}} às {{hora_fim}} · Pacote: {{pacote}} · Tema: {{tema}}**
 
-Cláusula 1ª.) O BUFFET {{empresa}} prestará serviços, em seu salão de eventos localizado à Avenida General Osório, 1442 - Trujillo - O CONTRATADO assume a responsabilidade de planejar, organizar e executar as expensas do CONTRATANTE, destinada à {{convidados}} pessoas no dia {{data_evento}}, das {{hora_inicio}} às {{hora_fim}}, devendo para tanto fornecer toda mão de obra bem como todo o material necessário para o evento, que será composto de: serviço de Buffet.
+Cláusula 1ª) O CONTRATADO prestará os serviços de buffet infantil do pacote acima, em seu salão de eventos, na data e no horário combinados.
 
-Cláusula 2ª.) O preço certo e contratado para o serviço descrito é: {{valor_total}} cujo pagamento deverá ser efetuado da seguinte maneira.
-DESCRIÇÃO: {{forma_pagamento}}
-BRINDE: {{brindes}}
+Cláusula 2ª) O preço contratado é {{valor_total}}, pago da seguinte forma: {{forma_pagamento}}.
+Brindes: {{brindes}}
 
-Cláusula 3ª.) O serviço do Buffet terá início a partir do horário combinado, conforme estabelecido no contrato, e terá duração de 4 horas, com direito a quinze minutos de tolerância que poderá ser computado no final do evento.
+Cláusula 3ª) O número de convidados é de {{convidados}} pessoas. Convidados além desse número serão cobrados à parte, no valor de {{valor_convidado_adicional}} por pessoa. O não comparecimento de convidados não reduz o valor contratado.
 
-Cláusula 4ª.) Caso o(a) CONTRATANTE exceda o limite de tolerância, será cobrado como multa 20% (vinte por cento) do valor total do contrato a cada 30 minutos excedidos, ou fração.
+Cláusula 4ª) A festa terá a duração prevista no pacote, com [tolerância] de tolerância. Passado esse tempo, poderá ser cobrada hora extra conforme a tabela do CONTRATADO.
 
-Cláusula 5ª.) O salão será disponibilizado à(o) CONTRATANTE, 15 (quinze) minutos antes do horário estabelecido para o início do evento, sendo certo que os serviços somente serão iniciados na hora prevista para o início do evento.
-Opcionais como massa show tem duração de 2 horas e 30 minutos, dentro das 4 horas de festa, sendo iniciado pontualmente com o horário da festa.
-Para melhor aproveitamento do tempo do evento o Buffet segue seu próprio cronograma de andamento de festa, não sendo possível fazer qualquer alteração do mesmo.
+Cláusula 5ª) Alteração de data depende de disponibilidade na agenda e deve ser pedida com [prazo] de antecedência. [Regras de remarcação do buffet.]
 
-Cláusula 6ª.) O número de convidados do(a) CONTRATANTE é de {{convidados}} pessoas. Fica pactuado entre as partes contratantes que, na hipótese de não comparecimento de todas as pessoas previstas neste contrato, não haverá restituição proporcional dos valores pagos. Se estendendo também a regra para possíveis convidados adicionais contratados.
+Cláusula 6ª) Em caso de cancelamento pelo CONTRATANTE, [regras de cancelamento e devolução do buffet].
 
-Cláusula 7ª.) O não comparecimento do número previsto de convidados não implicará na redução do preço total do evento contratado.
+Cláusula 7ª) Não é permitida a entrada de alimentos e bebidas de fora, exceto o que for combinado por escrito com o CONTRATADO.
 
-Cláusula 8ª.) Crianças com até 4 anos serão consideradas como cortesia do {{empresa}}, não sendo computadas para efeito de cobrança, no limite de até 15 crianças acompanhadas de um responsável (maior de idade). Pai e mãe do(a) aniversariante, serão considerados como cortesia. No caso das festas duplas será considerado apenas um pai e mãe como brinde no contrato fechado.
-Importante: O BUFFET {{empresa}}, se reserva no direito de não aceitar crianças menores de 06 anos desacompanhadas dos pais ou responsáveis.
+Cláusula 8ª) O CONTRATANTE responde por danos causados por ele ou por seus convidados às instalações e aos equipamentos do CONTRATADO.
 
-Cláusula 9ª.) O controle de convidados será feito em lista nominal. É obrigação do(a) CONTRATANTE ou de pessoa por Ele(a) designada, acompanhar o seu preenchimento, sendo-lhe assegurado o direito de contestar durante a realização do evento. Não sendo aceito, averiguação, reclamação e/ou devolução de valores após o evento.
+Cláusula 9ª) As partes elegem o foro da comarca de [cidade do buffet] para resolver qualquer questão sobre este contrato.
 
-Cláusula 10ª.) Se o(a) CONTRATANTE desejar alterar a data da realização do evento, deverá comunicar o BUFFET {{empresa}}. O CONTRATADO procederá com a alteração, desde que haja disponibilidade na agenda de eventos do BUFFET dentro do ano contratado, e o CONTRATANTE deverá arcar com a multa de R$ 500,00 (quinhentos reais) referente a reserva de data, se o mesmo desejar a alteração para o ano seguinte, deverá arcar com as custas referente ao reequilíbrio de custos para a mudança. A transferência do evento: será possível desde que não haja reserva para o dia e horário desejado. Se a transferência for solicitada com menos de 60 (sessenta) dias, incidirá uma taxa de 20% sobre o valor total do contrato.
-Para alteração de data solicitada em 48h antes do evento, incidirá uma multa de 50% sobre o valor contratado a titulo de indenização por perdas e danos;
-Em caso de doença, falecimento, ou algum acidente envolvendo, exclusivamente, aniversariante, pai, mãe ou irmãos do aniversariante, é necessário a apresentação de um documento médico atestando a doença e impossibilidade da realização do evento.
-
-Cláusula 11ª.) A falta de pagamento nos prazos estipulados sujeita o CONTRATANTE ao pagamento de juros legais e atualização monetária com base na variação do IGPM/GV, a partir da data de vencimento, além de despesas bancárias, sem prejuízo da rescisão do contrato que poderá ser exigida pelo CONTRATADO.
-
-Cláusula 12ª.) Em caso de inadimplência, fica autorizado a inclusão do nome do(a) CONTRATANTE junto aos órgãos de proteção ao crédito, permanecendo as negativações até a quitação do débito.
-
-Cláusula 13ª.) No caso de atraso no pagamento da(s) parcela(s), arcará o(a) CONTRATANTE com multa de 10% (dez por cento), além de juros de mora de 1% ao mês e correção monetária pela variação do IGP-M da Fundação Getúlio Vargas.
-Os boletos já emitidos não poderão ser cancelados e nem reemitidos.
-Após o vencimento deverão ser pagos diretamente nas agências bancárias juntamente com seus juros e multa.
-
-Cláusula 14ª.) O não pagamento, total ou parcial de quaisquer das parcelas, será interpretado como desistência do evento, acarretando o seu imediato cancelamento, independente de qualquer aviso ou notificação.
-
-Cláusula 15ª.) O(a) CONTRATANTE poderá aumentar o número de convidados, devendo para tanto comunicar o BUFFET {{empresa}} em até no máximo 10 (DEZ) dias que antecedem o evento, sob pena dos serviços atenderem apenas a demanda contratada.
-
-Cláusula 16ª.) Caso o número de convidados ultrapasse o número já contratado, o valor adicional por convidado será: {{pacote}} - {{valor_convidado_adicional}} por "convidado adicional". Será concedido desconto de R$ 5,00 por "convidado adicional" se o pagamento ocorrer com antecedência de 10 (dez) dias da data do evento.
-Valores adicionais descritos acima é referente a realização do evento até {{data_evento}}
-
-Cláusula 17ª.) O valor correspondente aos "convidados adicionais", deverá ser pago à vista e ao final do evento, sob pena de sofrer acréscimo de 10% (dez por cento).
-
-Cláusula 18ª.) Obriga-se o BUFFET {{empresa}} a reservar o seu espaço e garantir a qualidade de seus serviços, desde que o número total de convidados presentes não exceda a 10% (dez por cento) do número previamente contratado, sem prejuízo da cobrança do valor previsto para "convidado adicional", nos termos deste contrato.
-
-Cláusula 19ª.) Não está incluída em nenhum dos nossos pacotes bebida alcoólica.
-
-Cláusula 20ª.) A cerveja (deve ser em lata, proibido garrafa em vidro) poderá ser gelada e servida pelo Buffet {{empresa}} e, será cobrado o valor de R$ 150,00 (cento e cinquenta reais) a ser pago junto no contrato e antes do dia do evento, se optar por contratar chopp a taxa passa a ser R$ 200,00 (duzentos reais) devendo ser chopeira elétrica e não gelo, o mesmo deve ser retirado logo após o término da festa. Fica expressamente proibida a entrada com cooler no estabelecimento ou bebida de fora, sendo necessário o contratante trazer ao salão dia antes do evento toda a bebida alcoólica.
-
-Cláusula 21ª.) O cancelamento do evento poderá ser requerido pelo(a) CONTRATANTE, desde que o faça mediante o prévio e necessário envio de carta por escrito ao BUFFET {{empresa}} observando-se o seguinte:
-- Até 60 (sessenta) dias antes do evento, serão restituídos 70% (setenta por cento) do valor contratado;
-- Desistência comunicada em prazo inferior a 60 (sessenta) dias que antecedem o evento, serão restituídos 50% (cinquenta por cento) do valor contratado, a título de indenização por perdas e danos.
-
-Cláusula 22ª.) O BUFFET não será responsabilizado por problemas advindos de falhas dos serviços públicos, tais como suspensão de energia elétrica, água, gás, etc. Se por motivo de caso fortuito ou de força maior não for possível realizar o evento, as partes em comum acordo definirão nova data, observando-se a disponibilidade da agenda do BUFFET {{empresa}}. Caso o(a) CONTRATANTE desista do evento não haverá restituição dos valores pagos.
-
-Cláusula 23ª.) Não estão incluídos nos serviços, a taxa de estacionamento dos veículos e os serviços de manobristas.
-
-Cláusula 24ª.) Comprovado que o(a) CONTRATANTE, terceiros contratados pelo mesmo ou seus convidados tenham dolosamente danificado móveis, chão, parede, equipamentos, utensílios tais como copos, pratos, talheres, toalhas e demais bens do BUFFET {{empresa}}, os prejuízos serão indenizados pelo(a) CONTRATANTE pelo valor de mercado.
-
-Cláusula 25ª.) Caso haja acidente de qualquer natureza durante o evento sem a ocorrência de culpa ou dolo do BUFFET {{empresa}}, este não terá nenhuma responsabilidade, podendo, se entender necessário prestar a assistência cabível.
-
-Cláusula 26ª.) O buffet estará disponível para montagem da decoração externa duas horas antes da festa. Sempre que tiver uma festa primeiro esse tempo se reduz para 1:45 min.
-É proibida a utilização da energia elétrica do buffet para quaisquer serviços externos.
-É responsabilidade do CONTRATANTE, decoração, vela, doces, papelaria, lembrancinhas para crianças e convidados, arranjos de mesa, toalhas de mesa e balões, sendo assim, não fornecidos pelo CONTRATADO.
-
-Cláusula 27ª.) Havendo qualquer danificação no salão (piso, parede, brinquedos, utensílios, etc) durante a festa, o Contratante terá que arcar com o valor de mercado referente ao dano causado, no final do evento, sendo pago à vista.
-
-Cláusula 28ª.) Quando for realizada a adesão dos opcionais cobertura fotográfica ou locação de projetor para vídeo vida os mesmos não poderão ser cancelados ou trocados por outros itens. No caso de qualquer outro opcional contratado a solicitação de troca pode ser realizada até 20 dias antes do evento.
-
-Cláusula 29ª.) Ao assinar este contrato, o CONTRATANTE está de acordo com o Uso de Imagem, pois o salão publica nas redes sociais, um vídeo com fotos do Evento realizado. Caso o CONTRATANTE não queira esta exposição, é necessário informar o CONTRATADO no ato do fechamento do contrato.
-
-Cláusula 30ª.) O BUFFET {{empresa}} não se responsabiliza por objetos esquecidos ou perdidos durante ou após a realização do evento.
-
-Cláusula 31ª.) O BUFFET {{empresa}} realiza periodicamente a manutenção preventiva dos brinquedos elétricos ou eletrônicos, porém, não será responsabilizado por brinquedos ou aparelhos que tenham quebrado de um evento para outro, sem tempo hábil para manutenção, nestes casos, O BUFFET {{empresa}} se reserva o direito do não funcionamento de até 10% dos equipamentos eletrônicos oferecidos na locação do salão.
-
-Cláusula 32ª.) O BUFFET {{empresa}} poderá indicar ou autorizar serviços profissionais e prestadores de serviços diversos tais como manobristas, estacionamento, shows, fotos, filmagens, retrospectiva, etc., os quais serão contratados diretamente pelo(a) CONTRATANTE, não ensejando para o BUFFET {{empresa}} qualquer responsabilização por tais serviços, ou de eventuais danos deles advindos. Caso seja necessário algum material do BUFFET {{empresa}}, o(a) CONTRATANTE deverá solicitar com antecedência de 10 (dez) dias da data de realização do evento.
-
-Cláusula 33ª.) Por haver preparo e manutenção de alimentos, é proibida a entrada e permanência de animais em nosso Buffet.
-
-Cláusula 34ª.) Após fechamento do contrato, não será possível a troca de pacote apenas inclusão de convidados adicionais não sendo possível também a transferência de uma unidade para outra, sendo Unidade I situada na Rua Abner Pacheco, 286 – Parque Manchester e Unidade II, situada na Avenida General Osório, 1442 – Bairro Trujillo, ambas na cidade de Sorocaba.
-
-Cláusula 35ª.) As partes contratantes elegem o foro da cidade de Sorocaba, Estado de São Paulo, para dirimir quaisquer controvérsias oriundas deste contrato, renunciando a qualquer outro, por mais privilegiado que seja.
-
-Sorocaba, {{data_contrato}}
+[Cidade do buffet], {{data_contrato}}
 
 _______________________________
 CONTRATANTE - CPF {{cpf}}
 {{nome_completo}}
 
 _______________________________
-BUFFET {{empresa}}`;
+{{empresa}}`;

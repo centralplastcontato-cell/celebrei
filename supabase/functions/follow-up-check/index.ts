@@ -2940,6 +2940,9 @@ async function processClientDataRequests({
         for (const lead of (closed || []) as any[]) {
           const { data: existing } = await supabase.from("client_data_requests").select("id").eq("lead_id", lead.id).limit(1);
           if (existing && existing.length > 0) continue;
+          // Fechado automático (contrato assinado): os dados do contratante já estão na plataforma
+          const { data: contractData } = await supabase.from("lead_contract_data").select("lead_id").eq("lead_id", lead.id).limit(1);
+          if (contractData && contractData.length > 0) continue;
           if (await sentDataInChat(lead.id, new Date(nowMs - 14 * 86400000).toISOString())) {
             console.log(`[follow-up-check] 📋 Lead ${lead.id} já mandou os dados pelo chat — sem link automático`);
             continue;
