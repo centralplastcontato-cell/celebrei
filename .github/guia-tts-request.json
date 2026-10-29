@@ -1,0 +1,22 @@
+{
+  "voice": "Puck",
+  "prompt": "Narrador brasileiro de vídeo tutorial de sistema, português do Brasil. Tom calmo, claro, didático e acolhedor, como um professor explicando passo a passo. Ritmo tranquilo, sem pressa e sem empolgação, nada de tom de vendedor ou locutor de propaganda. Faça pequenas pausas entre as frases. 'IA' se pronuncia 'i-á'.",
+  "strict": " Leia exatamente o texto, palavra por palavra, sem acrescentar nenhuma palavra, interjeição ou comentário.",
+  "name": "atend2",
+  "min": 0.97,
+  "tries": 6,
+  "segments": [
+    "Na Central de Atendimento ficam todas as conversas do WhatsApp do seu buffet, num lugar só. A IA e a sua equipe trabalham juntas aqui. Vamos ver como usar.",
+    "No menu, clique em Central de Atendimento, na aba Chat. Use a busca para achar um cliente pelo nome ou pelo número. O número azul ao lado da conversa mostra quantas mensagens ainda não foram lidas. E o ícone roxo de brilho mostra que a IA está atendendo aquele cliente.",
+    "Abra uma conversa. Em cima, fica o status do cliente. Algumas etapas mudam sozinhas: quando a IA manda o PDF, vira orçamento enviado; quando ela marca a visita, vira visita. As outras, como negociando e fechado, você marca tocando na etapa certa. Assim, o seu funil fica em dia.",
+    "Para responder, escreva embaixo. No ícone da pasta, você manda os materiais prontos, como fotos, vídeo e o PDF dos pacotes. E no microfone, você grava um áudio.",
+    "No topo da conversa ficam os atalhos. No i, você abre a ficha completa do cliente. No calendário, você marca a visita. E no x, você encerra a conversa quando o atendimento terminar.",
+    "Em Filtros, você separa as conversas. Por exemplo: só as não lidas, ou as que a IA passou para a equipe, que são as que precisam de alguém agora.",
+    "Depois de cada visita, aparece este aviso laranja perguntando se a visita aconteceu. Responda com Veio, Não veio ou Remarcou. Isso mantém a agenda e os relatórios certinhos.",
+    "Mantenha o status de cada cliente sempre em dia. Assim, o funil, as campanhas e os relatórios mostram a realidade do seu buffet."
+  ],
+  "run": 6,
+  "only": [
+    2
+  ]
+}

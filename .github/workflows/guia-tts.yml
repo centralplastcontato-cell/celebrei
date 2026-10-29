@@ -1,0 +1,87 @@
+name: Narração do guia (Google, temporário)
+
+# Gera a narração (Google TTS, voz do Postaí), confere cada trecho transcrevendo
+# e refaz os que saírem com palavra a mais ou a menos. Grava os áudios na branch.
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/guia-tts-request.json"]
+
+permissions:
+  contents: write
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Gerar e conferir
+        env:
+          GOOGLE_TTS_CREDENTIALS: ${{ secrets.GOOGLE_TTS_CREDENTIALS }}
+        run: |
+          pip install -q google-auth requests faster-whisper
+          python - <<'PY'
+          import base64, difflib, json, os, re, shutil, unicodedata, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          info = json.loads(os.environ["GOOGLE_TTS_CREDENTIALS"])
+          cred = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+          cred.refresh(Request())
+          H = {"Authorization": f"Bearer {cred.token}"}
+          req = json.load(open(".github/guia-tts-request.json"))
+          GEM = f"https://us-central1-aiplatform.googleapis.com/v1/projects/{info['project_id']}/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent"
+          def words(t):
+              t = unicodedata.normalize("NFD", t.lower())
+              t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+              return re.findall(r"[a-z0-9]+", t)
+          from faster_whisper import WhisperModel
+          W = WhisperModel("small", device="cpu", compute_type="int8")
+          import wave
+          import numpy as np
+          def transcribe(wav):
+              with wave.open(wav) as w:
+                  sr = w.getframerate(); x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+              n = int(len(x) * 16000 / sr)
+              x = np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
+              segs, _ = W.transcribe(x, language="pt", beam_size=5)
+              return " ".join(x.text.strip() for x in segs)
+          def score(text, wav):
+              tr = transcribe(wav)
+              if tr is None: return 0, None
+              return difflib.SequenceMatcher(None, words(text), words(tr)).ratio(), tr
+          def synth(text, out):
+              body = {"input": {"text": text, "prompt": req["prompt"] + req.get("strict", "")},
+                      "voice": {"languageCode": "pt-BR", "name": req["voice"], "modelName": "gemini-2.5-flash-tts"},
+                      "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": 24000}}
+              r = requests.post("https://texttospeech.googleapis.com/v1beta1/text:synthesize", json=body, headers=H, timeout=180)
+              if not r.ok: print("tts erro", r.status_code, r.text[:200]); return False
+              open(out, "wb").write(base64.b64decode(r.json()["audioContent"])); return True
+          name = req.get("name", "guia")
+          os.makedirs(f"guia-audio/{name}", exist_ok=True)
+          only = req.get("only")
+          report = {}
+          for i, text in enumerate(req["segments"]):
+              if only is not None and i not in only: continue
+              best = (-1, None, None)
+              for t in range(req.get("tries", 5)):
+                  tmp = f"/tmp/t{i}-{t}.wav"
+                  if not synth(text, tmp): continue
+                  s, tr = score(text, tmp)
+                  print(i, t, round(s, 3), tr if s < req.get("min", 0.93) else "")
+                  if s > best[0]: best = (s, tmp, tr)
+                  if s >= req.get("min", 0.93): break
+              if best[1]:
+                  shutil.copy(best[1], f"guia-audio/{name}/{i:02d}.wav")
+                  report[i] = {"nota": round(best[0], 3), "transcricao": best[2]}
+          json.dump(report, open(f"guia-audio/{name}/relatorio.json", "w"), ensure_ascii=False, indent=1)
+          PY
+      - name: Gravar os áudios na branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add guia-audio
+          git commit -m "Narração do guia (áudios gerados)" || exit 0
+          git push
