@@ -70,13 +70,23 @@ export async function linkPreviewMeta(url: string): Promise<LinkMeta | null> {
 
 /**
  * Corpo do /send-link da Z-API, ou null para mandar como texto. A Z-API pede o
- * link no FINAL da mensagem; com texto depois do link, segue como texto simples.
+ * link no FINAL da mensagem (modelos antigos tinham texto depois dele).
  */
 export async function zapiLinkBody(phone: string, message: string): Promise<Record<string, unknown> | null> {
   const text = linkPreviewText(message);
   const url = text ? previewLinkUrl(text) : null;
-  if (!text || !url || !text.trimEnd().endsWith(url)) return null;
+  if (!text || !url) return null;
   const meta = await linkPreviewMeta(url);
   if (!meta) return null;
-  return { phone, message: text, image: meta.image, linkUrl: url, title: meta.title, linkDescription: meta.description, linkType: "LARGE" };
+  return { phone, message: linkAtEnd(text, url), image: meta.image, linkUrl: url, title: meta.title, linkDescription: meta.description, linkType: "LARGE" };
+}
+
+/** A Z-API pede o link no fim: texto que vinha depois dele sobe para antes */
+export function linkAtEnd(text: string, url: string): string {
+  if (text.trimEnd().endsWith(url)) return text;
+  const at = text.indexOf(url);
+  if (at < 0) return text;
+  const before = text.slice(0, at).trimEnd();
+  const after = text.slice(at + url.length).trim();
+  return [before, after, url].filter(Boolean).join("\n\n");
 }

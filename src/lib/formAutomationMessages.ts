@@ -14,7 +14,7 @@ export const FORM_AUTOMATION_DEFAULT_MESSAGES: Record<FormAutomationType, string
   cardapio:
     "Olá {{nome}}! 🍽️\n\nVamos definir o cardápio da sua festa? Acesse o link abaixo e escolha as opções:\n\n{{link}}",
   contrato:
-    "Olá {{nome}}! 😊\n\nEstamos finalizando os detalhes da sua festa no {{empresa}} no dia {{data_evento}}.\n\nPara seguirmos, preciso que você preencha seus dados pessoais e as informações do aniversariante no link abaixo:\n\n{{link}}\n\nAssim o buffet consegue finalizar o preenchimento do contrato com essas informações. 🎉",
+    "Olá {{nome}}! 😊\n\nEstamos finalizando os detalhes da sua festa no {{empresa}} no dia {{data_evento}}.\n\nPara seguirmos, preencha seus dados pessoais e as informações do aniversariante no link abaixo. Assim o buffet consegue finalizar o contrato com essas informações. 🎉\n\n{{link}}",
   contrato_whatsapp:
     "Olá {{nome}}! 📄\n\nSegue em anexo o contrato *{{nome_contrato}}* referente à sua festa.\n\nQualquer dúvida, estamos à disposição!\n\n_{{empresa}}_",
   contrato_envio:

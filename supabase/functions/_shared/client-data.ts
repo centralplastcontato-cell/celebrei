@@ -30,7 +30,7 @@ export const DEFAULT_CLIENT_DATA_REMINDERS = [
 ];
 
 export const DEFAULT_CLIENT_DATA_MESSAGE =
-  "Olá {{nome}}! 😊\n\nEstamos finalizando os detalhes da sua festa no {{empresa}} no dia {{data_evento}}.\n\nPara seguirmos, preciso que você preencha seus dados pessoais e as informações do aniversariante no link abaixo:\n\n{{link}}\n\nAssim o buffet consegue finalizar o preenchimento do contrato com essas informações. 🎉";
+  "Olá {{nome}}! 😊\n\nEstamos finalizando os detalhes da sua festa no {{empresa}} no dia {{data_evento}}.\n\nPara seguirmos, preencha seus dados pessoais e as informações do aniversariante no link abaixo. Assim o buffet consegue finalizar o contrato com essas informações. 🎉\n\n{{link}}";
 
 /** Mesmas variáveis da tela (resolveFormAutomationMessage) */
 export function fillClientDataTemplate(template: string, vars: { nome?: string | null; empresa?: string | null; data_evento?: string | null; link: string }): string {
