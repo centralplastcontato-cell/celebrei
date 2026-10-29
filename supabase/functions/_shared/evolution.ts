@@ -136,7 +136,37 @@ export interface EvolutionQuoted {
   participant: string;
 }
 
-export function evolutionSendText(token: string, to: string, text: string, quoted?: EvolutionQuoted | null): Promise<EvolutionResult> {
+// Links dos formulários e do contrato: vão com prévia (imagem e nome do buffet),
+// como no app. Outros links seguem como texto simples.
+const PREVIEW_PATH = /\/(dados|dados-contratante|assinar-contrato|avaliacao|pre-festa|prefesta|contrato)\//i;
+
+/**
+ * Texto com o 1º link de formulário já com "https://" (a Evolution só monta a
+ * prévia com o endereço completo). null = sem link que mereça prévia.
+ */
+export function linkPreviewText(text: string): string | null {
+  const re = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s]*/gi;
+  for (const m of text.matchAll(re)) {
+    const raw = m[0];
+    if (!PREVIEW_PATH.test(raw)) continue;
+    if (/^https?:\/\//i.test(raw)) return text;
+    const at = m.index ?? 0;
+    // "e-mail@buffet.com.br/x" ou parte de outra palavra: não é link
+    if (at > 0 && /[\w@.-]/.test(text[at - 1])) continue;
+    return text.slice(0, at) + "https://" + raw + text.slice(at + raw.length);
+  }
+  return null;
+}
+
+export async function evolutionSendText(token: string, to: string, text: string, quoted?: EvolutionQuoted | null): Promise<EvolutionResult> {
+  const withPreview = quoted ? null : linkPreviewText(text);
+  if (withPreview) {
+    // Sem prévia (página fora do ar, imagem que não abre): a Evolution responde erro e
+    // vai como texto, igual antes. Sem resposta (tempo esgotado) não reenvia: pode ter saído.
+    const res = await evolutionRequest(token, "/send/link", "POST", { number: evolutionNumber(to), text: withPreview }, 45000);
+    if (res.ok || isHeldError(res.error) || res.status === undefined) return res;
+    console.warn(`[evolution] /send/link falhou (${res.status}): ${String(res.error || "").slice(0, 120)} — enviando como texto`);
+  }
   return evolutionRequest(token, "/send/text", "POST", { number: evolutionNumber(to), text, ...(quoted ? { quoted } : {}) });
 }
 

@@ -633,6 +633,19 @@ interface SystemPromptParts {
   dynamic: string;
 }
 
+/**
+ * Vitor (29/10): a IA foi de nome → mês → convidados → materiais e nunca
+ * perguntou de quem era a festa. Na conversa de festa, sem aniversariante
+ * registrado e sem ter perguntado ainda, a próxima mensagem pergunta.
+ */
+export function birthdayQuestionDue(bd: Json, lastUserText: string, assistantTexts: string[]): boolean {
+  if (bd.tipo_evento === 'empresa' || firstNameOrEmpty(bd.aniversariante as string)) return false;
+  if (!bd.mes && !bd.convidados && !/anivers/i.test(lastUserText || '')) return false;
+  // Só a pergunta em si: a legenda das fotos fala da "carinha de quem faz aniversário" e não conta
+  const asked = /de quem (é|e|vai ser) a festa|nome d[oa] (criança|aniversariante)|quem (é|vai ser) [oa] aniversariante/i;
+  return !assistantTexts.some((t) => asked.test(String(t || '')));
+}
+
 function buildSystemPrompt(companyName: string, unit: string, settings: AiSettings, today: string, ctx: PromptContext): SystemPromptParts {
   const offersText = ctx.offers.length > 0
     ? ctx.offers.map(formatSlot).join(' ou ')
@@ -2556,6 +2569,10 @@ export async function maybeHandleWithAiAgent(
         ? 'DIA DA FESTA: ainda não sabemos — você perguntou se ele já tem um dia em mente. Se ele disser um dia, use consultar_datas_livres com essa data e conte se está livre; se estiver, ' + (conv.__teamVisits ? 'comemore e siga a conversa' : 'convide para conhecer o espaço com 2 horários') + '. Se ele ainda não souber o dia, siga com o convite para a visita'
         : null,
       bd.tipo_evento === 'empresa' ? `EMPRESA — confraternização${bd.empresa ? ` da ${bd.empresa}` : ''} (não pergunte de aniversariante)` : null,
+      firstNameOrEmpty(bd.aniversariante as string) ? `aniversariante ${bd.aniversariante}` : null,
+      birthdayQuestionDue(bd, lastUserText, chatMessages.filter((m) => m.role === 'assistant').map((m) => m.content))
+        ? 'ANIVERSARIANTE: ainda não sabemos de quem é a festa. Na sua PRÓXIMA mensagem, pergunte de forma natural o nome e a idade de quem faz aniversário ("E de quem é a festa? 🎈"), junto com o que mais for perguntar, sem atrasar a conversa. Quando o cliente disser, registre com registrar_dados_festa (aniversariante). Pergunte uma vez só'
+        : null,
       typeof bd.data_festa === 'string' && bd.data_ocupada_avisada === bd.data_festa
         ? `data pedida ${formatDateLong(bd.data_festa)} (${bd.data_festa}) — JÁ RESERVADA: o cliente já foi avisado e recebeu outras datas livres; não trate como a data da festa e, quando ele escolher outra, consulte essa nova data`
         : typeof bd.data_festa === 'string' ? `data da festa ${formatDateLong(bd.data_festa)} (${bd.data_festa}) — use esta data em consultar_valor_pacote enquanto o cliente não mudar${

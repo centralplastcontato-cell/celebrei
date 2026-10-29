@@ -210,3 +210,15 @@ Deno.test("resposta citando: stanzaID da Evolution vira stanzaId", () => {
   p.data.Message = { imageMessage: { URL: "https://mmg.whatsapp.net/x", contextInfo: { stanzaID: "3EB00D1DC0C2D64426C916" } } };
   assertEquals(normalizeEvolutionPayload(p)!.data.message.imageMessage.contextInfo.stanzaId, "3EB00D1DC0C2D64426C916");
 });
+
+Deno.test("prévia do link: só links de formulário/contrato, sempre com https://", async () => {
+  const { linkPreviewText } = await import("./evolution.ts");
+  assertEquals(
+    linkPreviewText("Preencha aqui:\n\nwww.castelodadiversao.com.br/dados/S7VVHZE\n\nObrigado!"),
+    "Preencha aqui:\n\nhttps://www.castelodadiversao.com.br/dados/S7VVHZE\n\nObrigado!",
+  );
+  assertEquals(linkPreviewText("https://buffet.com.br/avaliacao/x/y"), "https://buffet.com.br/avaliacao/x/y");
+  assertEquals(linkPreviewText("Veja nosso Instagram instagram.com/castelo"), null);
+  assertEquals(linkPreviewText("Oi! Tudo bem?"), null);
+  assertEquals(linkPreviewText("email contato@buffet.com.br/dados/x"), null);
+});
