@@ -12,6 +12,7 @@ import {
   clientDataMessageLink,
   clientDataUrl,
   createClientDataRequest,
+  isPastEventRequest,
   latestClientDataByLead,
 } from "@/lib/clientDataRequest";
 
@@ -87,6 +88,8 @@ export function ClientDataBar({ companyId, companyName, customDomain, lead, send
   };
 
   const state = request ? clientDataState(request) : null;
+  // Cliente que voltou: os dados recebidos são da festa que já aconteceu
+  const pastParty = !!request && isPastEventRequest(request.event_date);
   const tone = state === "recebido" ? "bg-green-500/10 text-green-800 border-green-500/20 dark:text-green-300"
     : state === "atrasado" ? "bg-red-500/10 text-red-700 border-red-500/20 dark:text-red-300"
     : state === "pendente" ? "bg-amber-500/10 text-amber-800 border-amber-500/20 dark:text-amber-300"
@@ -95,21 +98,24 @@ export function ClientDataBar({ companyId, companyName, customDomain, lead, send
   return (
     <>
       <div className={cn("flex items-center gap-2 border-b px-3 py-1.5 text-xs font-medium shrink-0", tone)}>
-        <span className="truncate">{request ? clientDataLabel(request) : "📋 Festa fechada: falta pedir os dados do contrato"}</span>
+        <span className="truncate">
+          {request ? clientDataLabel(request) : "📋 Festa fechada: falta pedir os dados do contrato"}
+          {pastParty && request?.event_date && <span className="opacity-80"> · festa de {request.event_date.split("-").reverse().join("/")}</span>}
+        </span>
         {request && (request.reminder_count || 0) > 0 && (request.reminder_count || 0) < 99 && state !== "recebido" && (
           <span className="shrink-0 opacity-80">· {request.reminder_count} cobrança{request.reminder_count === 1 ? "" : "s"}</span>
         )}
         <div className="ml-auto flex items-center gap-1 shrink-0">
-          {!request && (
+          {(!request || pastParty) && (
             <Button size="sm" className="h-7 px-2 text-xs" onClick={askData} disabled={busy}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              <span className={cn("ml-1", compact && "sr-only")}>Pedir dados</span>
+              <span className={cn("ml-1", compact && "sr-only")}>{pastParty ? "Pedir dados da nova festa" : "Pedir dados"}</span>
             </Button>
           )}
           {request && state === "recebido" && (
             <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setOpen(true)}>Ver dados</Button>
           )}
-          {request && state !== "recebido" && (
+          {request && state !== "recebido" && !pastParty && (
             <>
               <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={resend} disabled={busy}>
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Reenviar"}

@@ -2891,9 +2891,11 @@ async function processClientDataRequests({
           .in("conversation_id", ids).eq("from_me", false).gte("timestamp", sinceIso).limit(300);
         return ((msgs || []) as Array<{ content: string | null }>).some((m) => hasCpfInText(m.content));
       };
+      // Sem festa ligada ao pedido: só a próxima festa do lead (a de uma cliente que voltou já passou)
       const eventDateLabel = async (eventId: string | null, leadId: string) => {
         let q = supabase.from("company_events").select("event_date");
-        q = eventId ? q.eq("id", eventId) : q.eq("lead_id", leadId).order("event_date", { ascending: false }).limit(1);
+        q = eventId ? q.eq("id", eventId) : q.eq("lead_id", leadId).neq("status", "cancelado")
+          .gte("event_date", new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })).order("event_date", { ascending: true }).limit(1);
         const { data } = await q;
         const d = (data || [])[0]?.event_date as string | undefined;
         return d ? d.split("-").reverse().join("/") : "";
@@ -2947,18 +2949,21 @@ async function processClientDataRequests({
           .select("id, name, unit")
           .eq("company_id", companyId).eq("status", "fechado")
           .gte("closed_at", new Date(nowMs - 2 * 86400000).toISOString()).limit(50);
+        const todayBr = new Date(nowMs).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
         for (const lead of (closed || []) as any[]) {
-          const { data: existing } = await supabase.from("client_data_requests").select("id").eq("lead_id", lead.id).limit(1);
-          if (existing && existing.length > 0) continue;
+          // Cliente que voltou: pedidos e contratos de festas que já aconteceram não contam
+          const { data: existing } = await supabase.from("client_data_requests").select("id, event:company_events(event_date)").eq("lead_id", lead.id);
+          if ((existing || []).some((r: any) => !r.event?.event_date || r.event.event_date >= todayBr)) continue;
           // Fechado automático (contrato assinado): os dados do contratante já estão na plataforma
-          const { data: contractData } = await supabase.from("lead_contract_data").select("lead_id").eq("lead_id", lead.id).limit(1);
-          if (contractData && contractData.length > 0) continue;
+          const { data: contracts } = await supabase.from("generated_contracts").select("id, event:company_events(event_date)").eq("lead_id", lead.id).neq("status", "cancelado");
+          if ((contracts || []).some((c: any) => !c.event?.event_date || c.event.event_date >= todayBr)) continue;
           if (await sentDataInChat(lead.id, new Date(nowMs - 14 * 86400000).toISOString())) {
             console.log(`[follow-up-check] 📋 Lead ${lead.id} já mandou os dados pelo chat — sem link automático`);
             continue;
           }
+          // Só a próxima festa: sem ela, o pedido entra sozinho na festa nova quando for criada
           const { data: events } = await supabase.from("company_events").select("id").eq("company_id", companyId).eq("lead_id", lead.id)
-            .order("event_date", { ascending: false }).limit(1);
+            .neq("status", "cancelado").gte("event_date", todayBr).order("event_date", { ascending: true }).limit(1);
           const token = shortClientToken();
           const { data: created, error: insErr } = await supabase.from("client_data_requests").insert({
             company_id: companyId, lead_id: lead.id, event_id: events?.[0]?.id || null, token,

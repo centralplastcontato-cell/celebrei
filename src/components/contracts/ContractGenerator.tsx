@@ -74,16 +74,22 @@ export function ContractGenerator({ userId, onClose }: Props) {
 
       if (!ev?.lead_id) { setLoading(false); return; }
 
-      const [leadRes, contractDataRes, clientDataReqRes] = await Promise.all([
+      const [leadRes, contractDataRes, clientDataReqRes, leadContractsRes] = await Promise.all([
         supabase.from("campaign_leads").select("id, name, whatsapp, month, guests, unit").eq("id", ev.lead_id).single(),
         (supabase as any).from("lead_contract_data").select("*").eq("lead_id", ev.lead_id).maybeSingle(),
         supabase.from("client_data_requests").select("client_data").eq("event_id", selectedEventId).eq("status", "completed").order("created_at", { ascending: false }).limit(1),
+        (supabase as any).from("generated_contracts").select("event_id").eq("lead_id", ev.lead_id).neq("status", "cancelado"),
       ]);
       setLeadData(leadRes.data);
       const reqData = (clientDataReqRes.data as any)?.[0]?.client_data as Record<string, any> | null;
       setClientReqData(reqData);
+      // Cliente que voltou: os dados salvos são do contrato da festa anterior.
+      // Reaproveita só os dados pessoais; valores, brindes e aniversariante vêm da festa nova.
+      const fromOtherParty = ((leadContractsRes.data || []) as Array<{ event_id: string | null }>).some((c) => c.event_id && c.event_id !== selectedEventId);
       if (contractDataRes.data) {
-        const cd = contractDataRes.data;
+        const cd = fromOtherParty
+          ? { ...contractDataRes.data, nome_aniversariante: null, idade_aniversariante: null, valor_sinal: null, valor_restante: null, forma_pagamento: null, brindes: null }
+          : contractDataRes.data;
         setContractData({
           nome: reqData?.nome || "",
           cpf: cd.cpf || "", rg: cd.rg || "", email: cd.email || "",

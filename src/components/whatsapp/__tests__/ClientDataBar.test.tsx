@@ -13,6 +13,9 @@ vi.mock("@/lib/clientDataRequest", async (orig) => {
         birthday_children: [{ name: "Murilo", age: "15", birthdate: "2013-07-04" }],
         responsaveis: [{ name: "Ana", phone: "15981007979", relation: "mãe" }],
       },
+    }], ["lead-2", {
+      id: "r2", token: "K7M2QX9", status: "completed", sent_at: "2026-04-20T23:52:00Z", completed_at: "2026-04-21T00:00:00Z",
+      client_data: { nome: "Patrícia" }, event_id: "ev-old", event_date: "2026-05-01",
     }]])),
   };
 });
@@ -28,5 +31,12 @@ describe("ClientDataBar", () => {
     expect(screen.getByText("15 anos · 04/07/2013")).toBeTruthy();
     expect(screen.getByText("(15) 98100-7979")).toBeTruthy();
     expect(screen.getByText("Copiar todos os dados")).toBeTruthy();
+  });
+
+  it("cliente que voltou: dados da festa que já passou e botão para pedir os da nova festa", async () => {
+    render(<ClientDataBar companyId="c" companyName="Castelo" lead={{ id: "lead-2", name: "Patrícia", status: "fechado" }} sendText={async () => {}} />);
+    await waitFor(() => expect(screen.getByText("Pedir dados da nova festa")).toBeTruthy());
+    expect(screen.getByText(/festa de 01\/05\/2026/)).toBeTruthy();
+    expect(screen.getByText("Ver dados")).toBeTruthy();
   });
 });

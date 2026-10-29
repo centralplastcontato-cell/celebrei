@@ -1111,6 +1111,13 @@ export function EventFormDialog({ open, onOpenChange, onSubmit, initialData, uni
       toast({ title: "Conflito de horário detectado", description: "Altere o horário, data ou unidade antes de salvar.", variant: "destructive" });
       return;
     }
+    // Cliente que volta: mudar a data de uma festa que já aconteceu apaga o histórico dela.
+    // O certo é criar uma festa nova para a mesma cliente.
+    const oldDate = initialData?.id ? initialData.event_date : "";
+    if (oldDate && oldDate < format(new Date(), "yyyy-MM-dd") && form.event_date !== oldDate) {
+      const shown = oldDate.split("-").reverse().join("/");
+      if (!confirm(`Esta festa já aconteceu (${shown}).\n\nSe a cliente está fechando uma festa NOVA, cancele e crie uma nova festa na Agenda: assim a festa antiga, os pagamentos e o contrato dela ficam como estão.\n\nMudar a data desta festa mesmo assim?`)) return;
+    }
     // Final safety check: re-query DB right before saving to catch race conditions
     // (e.g. user clicks save before the debounced 300ms detector finishes)
     if (form.start_time && currentCompany?.id) {

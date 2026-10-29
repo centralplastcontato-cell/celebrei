@@ -35,6 +35,8 @@ export interface ClientDataRequestRow {
   reminder_count?: number | null;
   overdue_alerted_at?: string | null;
   event_id?: string | null;
+  /** Data da festa ligada ao pedido (para saber se é de uma festa que já aconteceu) */
+  event_date?: string | null;
 }
 
 export type ClientDataState = "pendente" | "atrasado" | "recebido";
@@ -60,20 +62,33 @@ export async function latestClientDataByLead(leadIds: string[]): Promise<Map<str
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await (supabase as any)
       .from("client_data_requests")
-      .select("id, token, status, sent_at, completed_at, client_data, reminder_count, overdue_alerted_at, event_id, lead_id, created_at")
+      .select("id, token, status, sent_at, completed_at, client_data, reminder_count, overdue_alerted_at, event_id, lead_id, created_at, event:company_events(event_date)")
       .in("lead_id", ids.slice(i, i + 200))
       .order("created_at", { ascending: false });
     if (error) break;
-    for (const row of (data || []) as Array<ClientDataRequestRow & { lead_id: string }>) {
-      if (!out.has(row.lead_id)) out.set(row.lead_id, row);
+    for (const row of (data || []) as Array<ClientDataRequestRow & { lead_id: string; event?: { event_date: string | null } | null }>) {
+      const { event, ...rest } = row;
+      if (!out.has(row.lead_id)) out.set(row.lead_id, { ...rest, event_date: event?.event_date ?? null });
     }
   }
   return out;
 }
 
+/** "2026-10-29" no fuso do Brasil */
+export function todayIsoBr(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/** Pedido de uma festa que já aconteceu (cliente que voltou): não vale para a festa nova */
+export function isPastEventRequest(eventDate: string | null | undefined): boolean {
+  return !!eventDate && eventDate < todayIsoBr();
+}
+
 /**
- * Cria o pedido (na festa do lead, se já existir) e devolve a mensagem pronta
- * com o link — quem chama envia pelo WhatsApp da conversa.
+ * Cria o pedido (na próxima festa do lead, se já existir) e devolve a mensagem
+ * pronta com o link — quem chama envia pelo WhatsApp da conversa. Festas que já
+ * aconteceram ficam de fora: na cliente que volta, o pedido espera a festa nova
+ * ser criada na Agenda e entra nela sozinho.
  */
 export async function createClientDataRequest(opts: {
   companyId: string;
@@ -88,7 +103,9 @@ export async function createClientDataRequest(opts: {
     .select("id, event_date")
     .eq("company_id", opts.companyId)
     .eq("lead_id", opts.leadId)
-    .order("event_date", { ascending: false })
+    .neq("status", "cancelado")
+    .gte("event_date", todayIsoBr())
+    .order("event_date", { ascending: true })
     .limit(1);
   const event = (events || [])[0] as { id: string; event_date: string | null } | undefined;
 
