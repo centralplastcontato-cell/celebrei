@@ -15,6 +15,7 @@ import { decideDeliveryStall, type OutgoingRow, STALL_LOOKBACK_MS } from "../_sh
 import { LOST_RESEND_AFTER_MS, LOST_RESEND_MAX_AGE_MS, LOST_RESEND_SOURCES, shouldResendLost } from "../_shared/lost-first-message.ts";
 import { isAiConversationalEnabled } from "../_shared/ai-module.ts";
 import { evolutionSendMedia, evolutionSendText, extractEvolutionMessageId } from "../_shared/evolution.ts";
+import { zapiLinkBody } from "../_shared/link-preview.ts";
 import { processAiAutoReturn } from "./ai-auto-return.ts";
 import { type AiTarget, freeSlotsBetween, journeyOwnsConversation, type JourneyScope, journeyScopes, loadAiJourneyTargets, runAiJourney } from "./ai-journey.ts";
 import { firstNameOf, partyYmdFromLead, postVisitDue, postVisitMessage } from "../_shared/post-visit.ts";
@@ -1863,9 +1864,17 @@ async function providerSendText(
     }
     let res: Response;
     if (provider === 'zapi') {
-      const url = `${ZAPI_BASE_URL}/${inst.instance_id}/token/${inst.instance_token}/send-text`;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (inst.client_token) headers['Client-Token'] = inst.client_token;
+      // Link de formulário/contrato: vai com prévia; se a Z-API recusar, segue como texto
+      const linkBody = extraBody ? null : await zapiLinkBody(phone.replace(/\D/g, ''), message);
+      if (linkBody) {
+        const lr = await fetch(`${ZAPI_BASE_URL}/${inst.instance_id}/token/${inst.instance_token}/send-link`, { method: 'POST', headers, body: JSON.stringify(linkBody) });
+        const ld = await lr.json().catch(() => null);
+        if (lr.ok && ld && !ld.error) return { ok: true, messageId: ld.zapiMessageId || ld.messageId || null };
+        console.warn(`[follow-up-check] Z-API send-link falhou (${lr.status}) — enviando como texto`);
+      }
+      const url = `${ZAPI_BASE_URL}/${inst.instance_id}/token/${inst.instance_token}/send-text`;
       res = await fetch(url, {
         method: 'POST',
         headers,
