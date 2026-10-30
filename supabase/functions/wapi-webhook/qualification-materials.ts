@@ -316,7 +316,9 @@ export async function sendQualificationMaterials(
           const isPkgImage = /\.(png|jpe?g|webp)(\?|$)/i.test(pdf.file_url || '');
           const cleanName = (pdf.name || 'Pacote').trim();
           if (isPkgImage) {
-            await sendImage(pdf.file_url, cleanName, `pdf_image_${i + 1}`);
+            // "Enviar sem legenda" (Materiais): o nome é só para a equipe — Mega Magic
+            // nomeou as imagens "1"…"5" e o cliente recebia "4", "5" embaixo da foto
+            await sendImage(pdf.file_url, pdf.send_without_caption ? '' : cleanName, `pdf_image_${i + 1}`);
           } else {
             const sanitizedName = cleanName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, ' ').trim();
             const fileName = `${sanitizedName || 'Pacote'}.pdf`;
