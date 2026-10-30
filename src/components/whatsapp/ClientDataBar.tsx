@@ -162,10 +162,17 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Documento com foto que o cliente mandou (bucket privado: link de 5 min) */
+/**
+ * Documento com foto que o cliente mandou (bucket privado: link de 5 min).
+ * Aparece aqui mesmo: no iPhone, abrir janela nova depois de buscar o link é
+ * bloqueado (o "Ver" não fazia nada). "Abrir em tela cheia" é um link de verdade.
+ */
 function DocumentField({ path, name }: { path: string; name?: string }) {
   const [opening, setOpening] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+  const isPdf = /\.pdf$/i.test(path);
   const open = async () => {
+    if (url) { setUrl(null); return; }
     setOpening(true);
     const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(path, 300);
     setOpening(false);
@@ -173,15 +180,27 @@ function DocumentField({ path, name }: { path: string; name?: string }) {
       toast({ title: "Não consegui abrir o documento", description: error?.message, variant: "destructive" });
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener");
+    setUrl(data.signedUrl);
   };
   return (
-    <button type="button" onClick={open} disabled={opening} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-left hover:bg-muted/60">
-      <span className="shrink-0 text-xs text-muted-foreground">Documento</span>
-      <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary">
-        <span className="truncate">{opening ? "Abrindo…" : `📎 Ver ${name ? `(${name})` : "documento"}`}</span>
-      </span>
-    </button>
+    <div>
+      <button type="button" onClick={open} disabled={opening} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-left hover:bg-muted/60">
+        <span className="shrink-0 text-xs text-muted-foreground">Documento</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-primary">
+          <span className="truncate">{opening ? "Abrindo…" : url ? "Fechar" : `📎 Ver ${name ? `(${name})` : "documento"}`}</span>
+        </span>
+      </button>
+      {url && (
+        <div className="space-y-2 px-2 pb-2">
+          {isPdf
+            ? <p className="text-xs text-muted-foreground">Documento em PDF.</p>
+            : <img src={url} alt="Documento do contratante" className="w-full rounded-xl border border-border/60 object-contain" />}
+          <a href={url} target="_blank" rel="noopener noreferrer" className="block text-center text-xs font-semibold text-primary underline">
+            {isPdf ? "Abrir o PDF" : "Abrir em tela cheia"}
+          </a>
+        </div>
+      )}
+    </div>
   );
 }
 
