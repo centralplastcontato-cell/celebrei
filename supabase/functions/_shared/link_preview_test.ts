@@ -34,3 +34,13 @@ Deno.test("prévia: link da Vamu 3D (parceira) também vai com miniatura", () =>
   assertEquals(previewLinkUrl("Veja: vamu3d.com.br/castelo?origem=ia"), "https://vamu3d.com.br/castelo?origem=ia");
   assertEquals(previewLinkUrl("Site: https://vamu3d.com.br/empresas"), null);
 });
+
+Deno.test("Z-API: link no meio da frase sai sem deixar emoji sozinho", async () => {
+  const { linkAtEnd } = await import("./link-preview.ts");
+  const url = "https://vamu3d.com.br/castelo?origem=ia";
+  assertEquals(
+    linkAtEnd(`Lembrancinhas não vêm nos pacotes 😊\n\nPelo link você pede e vê os valores: ${url} 🎁\n\nSe ficou alguma dúvida, me conta ✨`, url),
+    `Lembrancinhas não vêm nos pacotes 😊\n\nPelo link você pede e vê os valores 👇 🎁\n\nSe ficou alguma dúvida, me conta ✨\n\n${url}`,
+  );
+  assertEquals(linkAtEnd(`Aqui está o link: ${url} 🎉`, url), `Aqui está o link 👇 🎉\n\n${url}`);
+});
