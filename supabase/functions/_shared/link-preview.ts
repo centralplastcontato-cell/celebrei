@@ -90,12 +90,22 @@ export async function zapiLinkBody(phone: string, message: string): Promise<Reco
   return { phone, message: linkAtEnd(text, url), image: meta.image, linkUrl: url, title: meta.title, linkDescription: meta.description, linkType: "LARGE" };
 }
 
-/** A Z-API pede o link no fim: texto que vinha depois dele sobe para antes */
+/**
+ * A Z-API pede o link no fim: o texto que vinha depois dele sobe para antes.
+ * Na linha de onde o link saiu, "…os valores:" vira "…os valores 👇" e o que
+ * vinha depois do link na mesma linha (ex.: um emoji) fica junto, sem sobrar
+ * sozinho numa linha.
+ */
 export function linkAtEnd(text: string, url: string): string {
   if (text.trimEnd().endsWith(url)) return text;
   const at = text.indexOf(url);
   if (at < 0) return text;
-  const before = text.slice(0, at).trimEnd();
-  const after = text.slice(at + url.length).trim();
-  return [before, after, url].filter(Boolean).join("\n\n");
+  const lineStart = text.lastIndexOf("\n", at) + 1;
+  const nl = text.indexOf("\n", at + url.length);
+  const lineEnd = nl < 0 ? text.length : nl;
+  const head = text.slice(lineStart, at).trimEnd();
+  const tail = text.slice(at + url.length, lineEnd).trim();
+  const line = [head.replace(/\s*:$/, " 👇"), tail].filter(Boolean).join(" ");
+  const rest = (text.slice(0, lineStart) + line + text.slice(lineEnd)).replace(/\n{3,}/g, "\n\n").trim();
+  return [rest, url].filter(Boolean).join("\n\n");
 }
