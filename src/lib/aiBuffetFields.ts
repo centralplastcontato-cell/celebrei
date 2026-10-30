@@ -12,6 +12,10 @@ export interface BuffetField {
   options?: string[];
   group: string;
   hint?: string;
+  /** Sugestões para tocar (Sobre o buffet): um toque acrescenta no campo, outro tira */
+  suggestions?: string[];
+  /** Como as sugestões se juntam: itens de lista (", ") ou frases (" ") */
+  joiner?: ", " | " ";
 }
 
 export const BUFFET_FIELDS: BuffetField[] = [
@@ -21,8 +25,8 @@ export const BUFFET_FIELDS: BuffetField[] = [
   { key: "endereco", label: "Endereço", type: "text", placeholder: "Rua X, 123 — Sorocaba/SP", group: "basico" },
   { key: "duracao", label: "Duração da festa", type: "text", placeholder: "3 horas", group: "basico" },
   { key: "faixa_etaria", label: "Faixa etária", type: "text", placeholder: "Crianças de 1 a 12 anos", group: "basico" },
-  { key: "estrutura", label: "Estrutura e brinquedos", type: "textarea", placeholder: "Cama elástica, piscina de bolinhas, arena de games, fraldário, área para os pais...", group: "estrutura", hint: "O que o espaço tem — é daqui que a IA responde \"o que tem aí?\"" },
-  { key: "diferenciais", label: "Diferenciais", type: "textarea", placeholder: "9 anos de tradição, +4.000 festas realizadas, nota 4,7 no Google, estacionamento próprio...", group: "estrutura", hint: "Argumentos que a IA usa para convencer e quebrar objeções" },
+  { key: "estrutura", label: "Estrutura e brinquedos", type: "textarea", placeholder: "Cama elástica, piscina de bolinhas, arena de games, fraldário, área para os pais...", group: "estrutura", hint: "O que o espaço tem — é daqui que a IA responde \"o que tem aí?\"", joiner: ", ", suggestions: ["Salão climatizado", "Brinquedão", "Cama elástica", "Piscina de bolinhas", "Tobogã", "Arena de games", "Área baby", "Fraldário", "Espaço para os pais", "Pista de dança", "Cozinha própria"] },
+  { key: "diferenciais", label: "Diferenciais", type: "textarea", placeholder: "9 anos de tradição, +4.000 festas realizadas, nota 4,7 no Google, estacionamento próprio...", group: "estrutura", hint: "Argumentos que a IA usa para convencer e quebrar objeções", joiner: ", ", suggestions: ["Anos de tradição (diga quantos)", "Milhares de festas realizadas", "Ótima avaliação no Google", "Monitores acompanhando as crianças", "Cardápio feito na hora pela nossa cozinha", "Uma festa por vez no salão", "Atendimento personalizado do começo ao fim", "Estacionamento próprio", "Segurança e limpeza em todos os brinquedos"] },
   // Perguntas rápidas: as mesmas que todo cliente faz no WhatsApp, com poucas
   // respostas possíveis. Nunca incluem valor/desconto — a IA nunca fala preço.
   { key: "comida_externa", label: "Pode levar comida/bolo de fora?", type: "select", options: ["À vontade", "Só bolo e doces", "Não, é tudo do buffet"], group: "perguntas" },
@@ -37,13 +41,25 @@ export const BUFFET_FIELDS: BuffetField[] = [
   { key: "monitores", label: "Monitores acompanhando as crianças", type: "select", options: ["O tempo todo", "Só nos brinquedos", "Não temos"], group: "perguntas" },
   // Degustação: a IA só informa; quem agenda é sempre a equipe (caso Amanda,
   // 14/10 — cliente perguntou de degustação e pediu "hoje", a IA marcou visita)
-  { key: "pagamento", label: "Formas de pagamento", type: "textarea", placeholder: "Pix, cartão ou boleto. A festa precisa estar quitada até 20 dias antes da data.", group: "perguntas", hint: "A IA responde \"aceita boleto?\" sozinha. Desconto, parcelas e negociação continuam com a equipe." },
+  { key: "pagamento", label: "Formas de pagamento", type: "textarea", placeholder: "Pix, cartão ou boleto. A festa precisa estar quitada até 20 dias antes da data.", group: "perguntas", hint: "A IA responde \"aceita boleto?\" sozinha. Desconto, parcelas e negociação continuam com a equipe.", joiner: " ", suggestions: ["Pix.", "Cartão de crédito.", "Cartão de débito.", "Boleto.", "Transferência bancária.", "Sinal na assinatura do contrato e o restante até a data combinada.", "A festa precisa estar quitada antes da data da festa.", "Parcelamento combinado com a equipe."] },
   { key: "degustacao", label: "Degustação do cardápio", type: "select", options: ["Não oferecemos degustação", "Oferecemos, agendada com a equipe, para quem tem interesse em fechar", "Oferecemos para todos, agendada com a equipe", "Só depois de fechar o contrato"], group: "perguntas", hint: "A IA nunca marca degustação: só informa como funciona, e quem agenda é a equipe." },
-  { key: "degustacao_como", label: "Como funciona a degustação", type: "textarea", placeholder: "Agendada com a equipe, às terças à tarde, para até 2 pessoas, depois da visita ao espaço...", group: "perguntas", hint: "Só se vocês oferecem. Deixe em branco se não oferecem." },
-  { key: "regras", label: "Regras e o que não fazemos", type: "textarea", placeholder: "Não fazemos festas externas. Visitas somente com agendamento...", group: "regras", hint: "Limites claros evitam que a IA prometa o que vocês não fazem" },
+  { key: "degustacao_como", label: "Como funciona a degustação", type: "textarea", placeholder: "Agendada com a equipe, às terças à tarde, para até 2 pessoas, depois da visita ao espaço...", group: "perguntas", hint: "Só se vocês oferecem. Deixe em branco se não oferecem.", joiner: " ", suggestions: ["A degustação é separada da visita ao espaço.", "Na visita, o cliente conhece o espaço e os pacotes, sem degustação.", "A degustação é planejada e combinada com a equipe, que marca o melhor dia e horário.", "A degustação acontece depois da visita ao espaço.", "A degustação é para até 2 pessoas.", "A IA não agenda degustação: quando o cliente pedir, ela passa o contato para a equipe."] },
+  { key: "regras", label: "Regras e o que não fazemos", type: "textarea", placeholder: "Não fazemos festas externas. Visitas somente com agendamento...", group: "regras", hint: "Limites claros evitam que a IA prometa o que vocês não fazem", joiner: " ", suggestions: ["Não fazemos festas fora do nosso espaço.", "Visitas somente com agendamento.", "Não negociamos valores pela conversa: descontos e fechamento são sempre com a equipe.", "A data só fica garantida com contrato assinado e sinal pago.", "Decoração não está inclusa nos pacotes.", "O horário de término da festa precisa ser respeitado.", "Não é permitido levar brinquedos infláveis ou atrações de fora sem combinar com a equipe."] },
   { key: "outros", label: "Outras informações", type: "textarea", placeholder: "Qualquer outra informação que a IA pode afirmar com segurança", group: "regras" },
 ];
 
+
+/** Toque numa sugestão: acrescenta no fim do campo ou, se já estiver lá, tira */
+export function toggleSuggestion(value: string, suggestion: string, joiner: ", " | " " = " "): string {
+  const v = value.trim();
+  if (v.includes(suggestion)) {
+    if (joiner === ", ") return v.split(/\s*,\s*/).filter((x) => x && x !== suggestion).join(", ");
+    return v.replace(suggestion, "").replace(/\s{2,}/g, " ").trim();
+  }
+  if (!v) return suggestion;
+  const base = joiner === ", " ? v.replace(/[.!]\s*$/, "") : /[.!?]$/.test(v) ? v : `${v}.`;
+  return `${base}${joiner}${suggestion}`;
+}
 
 export function serializeBuffetInfo(values: Record<string, string>): string | null {
   const parts = BUFFET_FIELDS
