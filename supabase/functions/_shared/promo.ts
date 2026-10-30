@@ -33,7 +33,9 @@ export function findPromotion(extra: string | null | undefined, todayYmd: string
     if (endYmd < todayYmd) continue;
     const today = new Date(`${todayYmd}T00:00:00Z`);
     const daysLeft = Math.round((end.getTime() - today.getTime()) / 86400000);
-    const title = (line.match(/^\s*(promo[çc][ãa]o[^(:—–-]*)/i)?.[1] || "promoção").trim();
+    // Campo "Promoção: PROMOÇÃO BLACK FRIDAY (...)" da tela de Promoção: o rótulo não é o título
+    const body = line.replace(/^\s*promo[çc][ãa]o:\s*/i, "");
+    const title = (body.match(/^\s*(promo[çc][ãa]o[^(:—–-]*)/i)?.[1] || "promoção").trim();
     const partyYear = Number(line.match(/festas?\s+(?:realizadas?\s+)?em\s+(20\d{2})/i)?.[1]) || null;
     return { title, endYmd, daysLeft, partyYear };
   }

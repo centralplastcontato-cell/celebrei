@@ -49,3 +49,13 @@ Deno.test("promoFitsParty: Claudia, festa em 2027, não recebe a promoção de 2
   assertEquals(promoFitsParty({ ...p, partyYear: null }, 2027), true); // promoção sem ano
   assertEquals(promoOffNote(p, 2027).includes("NÃO fale dessa promoção"), true);
 });
+
+Deno.test("promoção da tela própria (campo \"Promoção:\"): título, prazo e ano da festa", () => {
+  const extra = "Promoção: PROMOÇÃO BLACK FRIDAY (válida para contratos fechados até 30/11/2026, para festas realizadas em 2026): 10 convidados a mais.\nEndereço: Rua X, 1";
+  const p = findPromotion(extra, "2026-11-20");
+  assertEquals(p?.title, "PROMOÇÃO BLACK FRIDAY");
+  assertEquals(p?.endYmd, "2026-11-30");
+  assertEquals(p?.daysLeft, 10);
+  assertEquals(p?.partyYear, 2026);
+  assertEquals(findPromotion(extra, "2026-12-01"), null);
+});
