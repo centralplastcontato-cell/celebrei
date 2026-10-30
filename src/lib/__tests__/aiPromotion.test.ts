@@ -24,3 +24,15 @@ describe("promoção do buffet", () => {
     expect(promotionDaysLeft("2026-11-30", new Date("2026-11-30T15:00:00Z"))).toBe(0);
   });
 });
+
+describe("ideias de promoção", () => {
+  it("preenche nome, benefício e regras e mantém a data escolhida", async () => {
+    const { PROMOTION_IDEAS, ideaToForm } = await import("../aiPromotion");
+    const bf = PROMOTION_IDEAS.find((i) => i.nome === "Black Friday")!;
+    const f = ideaToForm(bf, { nome: "", beneficio: "", ate: "2026-11-30", anoFesta: "", regras: "" });
+    expect(f.nome).toBe("Black Friday");
+    expect(f.ate).toBe("2026-11-30");
+    const next = PROMOTION_IDEAS.find((i) => i.nextYear)!;
+    expect(ideaToForm(next, { nome: "", beneficio: "", ate: "", anoFesta: "", regras: "" }, new Date("2026-10-30T12:00:00Z")).anoFesta).toBe("2027");
+  });
+});
