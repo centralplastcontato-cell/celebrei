@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, CheckCircle2, User, CreditCard, MapPin, Mail, Calendar, FileText, Baby, Plus, Trash2, MessageCircle, Instagram, PartyPopper } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatCPF, isValidCPF } from "@/lib/mask-utils";
+import { prepareDocument, uploadClientDocument } from "@/lib/documentUpload";
 
 interface RequestInfo {
   id: string;
@@ -197,17 +198,20 @@ export default function PublicClientData() {
 
   const handleDocument = async (file: File | undefined) => {
     if (!file || !requestInfo || !token) return;
-    if (file.size > 10 * 1024 * 1024) {
+    setUploadingDoc(true);
+    // Foto reduzida e convertida para JPG no próprio celular (fotos de 5–12 MB / HEIC eram recusadas)
+    const doc = await prepareDocument(file);
+    if (doc.blob.size > 10 * 1024 * 1024) {
+      setUploadingDoc(false);
       toast({ title: "Arquivo muito grande", description: "Envie uma foto ou PDF de até 10 MB.", variant: "destructive" });
       return;
     }
-    setUploadingDoc(true);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
-    const path = `${requestInfo.company_id}/${token}/${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("client-documents").upload(path, file, { contentType: file.type || undefined });
+    const path = `${requestInfo.company_id}/${token}/${crypto.randomUUID()}.${doc.ext}`;
+    const upErr = await uploadClientDocument(path, doc);
     setUploadingDoc(false);
     if (upErr) {
-      toast({ title: "Não consegui enviar o documento", description: "Tente de novo ou mande uma foto menor.", variant: "destructive" });
+      console.error("[dados] envio do documento:", upErr, file.type, file.size);
+      toast({ title: "Não consegui enviar o documento", description: `Tente de novo ou mande outra foto. (${upErr.slice(0, 80)})`, variant: "destructive" });
       return;
     }
     setForm((prev) => ({ ...prev, documento_arquivo: path, documento_nome: file.name }));
