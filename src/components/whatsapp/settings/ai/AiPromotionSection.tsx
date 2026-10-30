@@ -4,7 +4,7 @@
 // depois dos valores, com os dias que faltam, e para sozinha no fim do prazo.
 
 import { useEffect, useMemo, useState } from "react";
-import { BadgePercent, Loader2, Trash2 } from "lucide-react";
+import { BadgePercent, Lightbulb, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { parseBuffetInfo, serializeBuffetInfo } from "@/lib/aiBuffetFields";
-import { EMPTY_PROMOTION, parsePromotion, promotionDaysLeft, serializePromotion, type PromotionForm } from "@/lib/aiPromotion";
+import { EMPTY_PROMOTION, PROMOTION_IDEAS, ideaToForm, parsePromotion, promotionDaysLeft, serializePromotion, type PromotionForm, type PromotionIdea } from "@/lib/aiPromotion";
 import { AiCard, SaveBar } from "./AiFormBits";
 import { useAiAgentSettings } from "./useAiAgentSettings";
 
@@ -68,8 +68,33 @@ export function AiPromotionSection() {
     write(p, empty ? "Promoção removida" : "Promoção salva — a IA já passa a oferecer");
   };
 
+  const useIdea = (idea: PromotionIdea) => {
+    const filled = p.nome.trim() || p.beneficio.trim();
+    if (filled && !confirm(`Trocar o que está preenchido pela ideia "${idea.nome}"?`)) return;
+    setP((prev) => ideaToForm(idea, prev));
+  };
+
   return (
     <div className="space-y-4">
+      <AiCard
+        icon={<Lightbulb className="h-4 w-4 text-amber-500" />}
+        title="Ideias de promoção"
+        description="Toque numa ideia para preencher. Depois ajuste o que o cliente ganha do jeito do seu buffet e escolha até quando vale."
+      >
+        <div className="flex flex-wrap gap-2">
+          {PROMOTION_IDEAS.map((idea) => (
+            <button
+              key={idea.nome}
+              type="button"
+              onClick={() => useIdea(idea)}
+              title={idea.beneficio}
+              className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:border-pink-400 hover:bg-pink-500/5"
+            >
+              {idea.emoji} {idea.nome}
+            </button>
+          ))}
+        </div>
+      </AiCard>
       <AiCard
         icon={<BadgePercent className="h-4 w-4 text-pink-600" />}
         title="Promoção do momento"

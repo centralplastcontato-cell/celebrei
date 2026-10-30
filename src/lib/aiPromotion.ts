@@ -42,3 +42,34 @@ export function promotionDaysLeft(ate: string, now = new Date()): number | null 
   const today = now.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   return Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
 }
+
+/** Ideias prontas (Configurações → IA → Promoção): um toque preenche, o buffet ajusta e escolhe a data */
+export interface PromotionIdea {
+  emoji: string;
+  nome: string;
+  beneficio: string;
+  regras: string;
+  /** só festas do ano que vem (ex.: garantir a festa do próximo ano) */
+  nextYear?: boolean;
+}
+
+export const PROMOTION_IDEAS: PromotionIdea[] = [
+  { emoji: "🖤", nome: "Black Friday", beneficio: "10 convidados a mais no pacote e parcelamento em 10x sem juros.", regras: "Não vale com outras promoções." },
+  { emoji: "📅", nome: "Datas especiais", beneficio: "Condição especial para festas de sexta-feira e domingo: 10 convidados a mais no pacote.", regras: "Só para festas de sexta-feira e domingo." },
+  { emoji: "🏰", nome: "Fechou na visita", beneficio: "Quem fechar o contrato no dia da visita ao espaço ganha 30 minutos a mais de festa.", regras: "Só para contratos fechados no mesmo dia da visita." },
+  { emoji: "🎂", nome: "Festa do ano que vem", beneficio: "Garanta a festa do ano que vem com o valor de hoje.", regras: "Sinal na assinatura do contrato.", nextYear: true },
+  { emoji: "🤝", nome: "Indique um amigo", beneficio: "Indicou um amigo e ele fechou a festa? Você ganha 10 convidados a mais na sua festa.", regras: "O amigo precisa fechar o contrato; o benefício vale para uma festa." },
+  { emoji: "💳", nome: "Parcela fácil", beneficio: "Parcelamento da festa em até 12x sem juros.", regras: "Festa quitada até 20 dias antes da data." },
+  { emoji: "🎄", nome: "Natal Mágico", beneficio: "Quem fechar a festa ganha a decoração de Natal no salão e uma visita especial do Papai Noel.", regras: "Só para festas em dezembro." },
+];
+
+export function ideaToForm(idea: PromotionIdea, current: PromotionForm, now = new Date()): PromotionForm {
+  const year = now.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }).slice(0, 4);
+  return {
+    ...current,
+    nome: idea.nome,
+    beneficio: idea.beneficio,
+    regras: idea.regras,
+    anoFesta: idea.nextYear ? String(Number(year) + 1) : current.anoFesta,
+  };
+}
