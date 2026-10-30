@@ -1,7 +1,11 @@
 // Prévia de link no WhatsApp (imagem, título e descrição do buffet) para os
-// links dos formulários e do contrato. Outros links seguem como texto simples.
+// links dos formulários e do contrato, e da página da parceira Vamu 3D (que a
+// IA manda quando perguntam de lembrancinhas). Outros links seguem como texto simples.
 
-const PREVIEW_PATH = /\/(dados|dados-contratante|assinar-contrato|avaliacao|pre-festa|prefesta|contrato)\//i;
+const FORM_PATH = /\/(dados|dados-contratante|assinar-contrato|avaliacao|pre-festa|prefesta|contrato)\//i;
+// Parceiras: a prévia vem da própria página (que já tem imagem e título)
+const PARTNER_LINK = /^(?:https?:\/\/)?(?:www\.)?vamu3d\.com\.br\/castelo\b/i;
+const PREVIEW_PATH = { test: (u: string) => FORM_PATH.test(u) || PARTNER_LINK.test(u) };
 
 /**
  * Texto com o 1º link de formulário já com "https://" (Evolution e Z-API só
@@ -56,6 +60,11 @@ export function parseOgMeta(html: string): LinkMeta | null {
 export async function linkPreviewMeta(url: string): Promise<LinkMeta | null> {
   try {
     const u = new URL(url);
+    // Página da parceira: a prévia é a da própria página
+    if (PARTNER_LINK.test(url)) {
+      const page = await fetch(url, { headers: { "user-agent": "facebookexternalhit/1.1" }, signal: AbortSignal.timeout(8000) });
+      return page.ok ? parseOgMeta(await page.text()) : null;
+    }
     const base = Deno.env.get("SUPABASE_URL") || "https://rsezgnkfhodltrsewlhz.supabase.co";
     const res = await fetch(`${base}/functions/v1/og-preview?domain=${encodeURIComponent(u.host)}&path=${encodeURIComponent(u.pathname)}`, {
       headers: { "user-agent": "facebookexternalhit/1.1" },
