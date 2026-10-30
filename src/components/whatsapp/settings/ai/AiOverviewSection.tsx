@@ -79,7 +79,13 @@ export function AiOverviewSection() {
     { label: "Número que a IA atende", done: !!settings.unit, detail: settings.unit || "Escolha abaixo" },
     { label: "Nome da assistente", done: !!(settings.assistant_name || "").trim(), item: "ia-apresentacao" },
     { label: "Horário da equipe e WhatsApp do alerta", done: !!settings.team_hours && !!(settings.handoff_alert_phone || "").trim(), item: "ia-apresentacao" },
-    { label: "Sobre o buffet", done: info.filled === info.total, detail: `${info.filled} de ${info.total}`, item: "ia-buffet" },
+    {
+      label: "Sobre o buffet",
+      done: info.filled === info.total,
+      // Poucos faltando: diz quais ("falta: Faixa etária"), em vez de só "16 de 17"
+      detail: info.missing.length > 0 && info.missing.length <= 3 ? `Falta: ${info.missing.join(", ")}` : `${info.filled} de ${info.total}`,
+      item: "ia-buffet",
+    },
     {
       label: "Pacotes com preços",
       done: !!catalog && catalog.packages > 0 && catalog.tiers > 0,
