@@ -7,6 +7,8 @@ export interface TeachContext {
   cliente?: string | null;
   /** a resposta da IA que o dono quer corrigir */
   resposta?: string | null;
+  /** motivo de a IA ter passado um cliente para a equipe (dúvida que ela não sabia) */
+  motivo?: string | null;
 }
 
 export interface TeachNote {
@@ -48,6 +50,7 @@ export function buildTeachUserMessage(text: string, ctx: TeachContext): string {
   const parts: string[] = [];
   if (ctx.cliente) parts.push(`Pergunta do cliente no teste: "${ctx.cliente.slice(0, 600)}"`);
   if (ctx.resposta) parts.push(`Resposta da IA que o dono quer corrigir: "${ctx.resposta.slice(0, 1500)}"`);
+  if (ctx.motivo) parts.push(`A IA passou um cliente para a equipe por não saber responder. Motivo anotado: "${ctx.motivo.slice(0, 600)}". Transforme a resposta do dono em regra geral para esse tipo de dúvida, sem citar o cliente.`);
   parts.push(`O que o dono ensinou: "${text.slice(0, 3000)}"`);
   return parts.join("\n\n");
 }

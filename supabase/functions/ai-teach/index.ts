@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       const session = createLlmSession({
         model: DEFAULT_AI_MODEL,
         system: buildTeachPrompt(company?.name || "Buffet", ((existing || []) as Array<{ text: string }>).map((e) => e.text)),
-        history: [{ role: "user", content: buildTeachUserMessage(text, { cliente: body.cliente, resposta: body.resposta }) }],
+        history: [{ role: "user", content: buildTeachUserMessage(text, { cliente: body.cliente, resposta: body.resposta, motivo: body.motivo }) }],
         tools: [],
         openaiKey,
         anthropicKey,

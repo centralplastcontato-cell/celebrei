@@ -10,6 +10,10 @@ import { toast } from "sonner";
 export interface TeachContext {
   cliente?: string | null;
   resposta?: string | null;
+  /** motivo da passagem para a equipe ("O que a IA passou para a equipe") */
+  motivo?: string | null;
+  /** de onde veio o ensinamento (ai_owner_notes.source); padrão: teste ou ensinar */
+  source?: string | null;
 }
 
 interface Note {
@@ -107,7 +111,7 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
     setBusy("organizar");
     try {
       const p = await invokeTeach<{ notes: Note[]; blocked: string | null; packageHint: boolean; visitHint?: boolean }>({
-        action: "propose", company_id: companyId, text, cliente: context?.cliente || null, resposta: context?.resposta || null,
+        action: "propose", company_id: companyId, text, cliente: context?.cliente || null, resposta: context?.resposta || null, motivo: context?.motivo || null,
       });
       setNotes(p.notes);
       setBlocked(p.blocked);
@@ -126,7 +130,7 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
     setBusy("salvar");
     const { data: auth } = await supabase.auth.getUser();
     const { error } = await (supabase as any).from("ai_owner_notes").insert(list.map((n) => ({
-      company_id: companyId, text: n.text, kind: n.kind, source: context ? "teste" : "ensinar", created_by: auth?.user?.id || null,
+      company_id: companyId, text: n.text, kind: n.kind, source: context?.source || (context ? "teste" : "ensinar"), created_by: auth?.user?.id || null,
     })));
     setBusy("");
     if (error) {
@@ -142,8 +146,15 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
     <Dialog open={open} onOpenChange={(v) => !busy && !recording && onOpenChange(v)}>
       <DialogContent className="max-h-[92dvh] max-w-md overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><GraduationCap className="h-5 w-5 text-primary" /> {context ? "Corrigir esta resposta" : "Ensinar a IA"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><GraduationCap className="h-5 w-5 text-primary" /> {context?.resposta ? "Corrigir esta resposta" : "Ensinar a IA"}</DialogTitle>
         </DialogHeader>
+
+        {context?.motivo && (
+          <div className="rounded-lg bg-muted/60 p-2.5 text-xs text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground">A IA passou para a equipe porque:</p>
+            <p className="line-clamp-5 whitespace-pre-line">{context.motivo}</p>
+          </div>
+        )}
 
         {context?.resposta && (
           <div className="rounded-lg bg-muted/60 p-2.5 text-xs text-muted-foreground">
@@ -155,7 +166,7 @@ export function AiTeachDialog({ open, onOpenChange, companyId, context, onSaved 
         {notes === null ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {context ? "Escreva ou grave como ela deveria ter respondido, ou o que estava errado." : "Escreva ou grave o que a IA deve saber ou fazer diferente no seu buffet."}
+              {context?.resposta ? "Escreva ou grave como ela deveria ter respondido, ou o que estava errado." : context?.motivo ? "Escreva ou grave a resposta para essa dúvida, como você explicaria para o cliente." : "Escreva ou grave o que a IA deve saber ou fazer diferente no seu buffet."}
             </p>
             <Textarea
               value={text}

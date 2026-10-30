@@ -26,3 +26,10 @@ Deno.test("ensinar: pedido de não marcar visita traz o aviso da configuração"
   const p = parseTeachProposal('{"notas":[{"texto":"Não ofereça horários de visita.","tipo":"orientacao"}],"bloqueado":null,"pacote":false,"visita":true}');
   assertEquals(p?.visitHint, true);
 });
+
+Deno.test("ensinar: dúvida de uma passagem para a equipe leva o motivo", () => {
+  const msg = buildTeachUserMessage("Pode sim, desde que fique na coleira.", { motivo: "cliente perguntou se pode levar cachorro" });
+  assertEquals(msg.includes('Motivo anotado: "cliente perguntou se pode levar cachorro"'), true);
+  assertEquals(msg.includes("regra geral"), true);
+  assertEquals(msg.includes("Pergunta do cliente no teste"), false);
+});
