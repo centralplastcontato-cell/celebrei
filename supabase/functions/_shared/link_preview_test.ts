@@ -25,3 +25,12 @@ Deno.test("Z-API: link vai para o fim da mensagem (modelos antigos tinham texto 
   );
   assertEquals(linkAtEnd(`Segue o link:\n\n${url}`, url), `Segue o link:\n\n${url}`);
 });
+
+Deno.test("prévia: link da Vamu 3D (parceira) também vai com miniatura", () => {
+  assertEquals(
+    previewLinkUrl("Aqui está o link: https://vamu3d.com.br/castelo?origem=ia 🎉"),
+    "https://vamu3d.com.br/castelo?origem=ia",
+  );
+  assertEquals(previewLinkUrl("Veja: vamu3d.com.br/castelo?origem=ia"), "https://vamu3d.com.br/castelo?origem=ia");
+  assertEquals(previewLinkUrl("Site: https://vamu3d.com.br/empresas"), null);
+});
