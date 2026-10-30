@@ -15,6 +15,9 @@ export interface BuffetField {
 }
 
 export const BUFFET_FIELDS: BuffetField[] = [
+  // Promoção: tela própria (Configurações → IA → Promoção), uma linha no formato de src/lib/aiPromotion.ts.
+  // Fica em 1º lugar para a IA achar esta antes de alguma promoção antiga escrita em "Outras informações".
+  { key: "promocao", label: "Promoção", type: "textarea", group: "promo" },
   { key: "endereco", label: "Endereço", type: "text", placeholder: "Rua X, 123 — Sorocaba/SP", group: "basico" },
   { key: "duracao", label: "Duração da festa", type: "text", placeholder: "3 horas", group: "basico" },
   { key: "faixa_etaria", label: "Faixa etária", type: "text", placeholder: "Crianças de 1 a 12 anos", group: "basico" },
@@ -75,7 +78,7 @@ export function parseBuffetInfo(text: string | null): Record<string, string> {
 }
 
 // Campos que podem ficar em branco sem contar como "falta"
-export const OPTIONAL_BUFFET_FIELDS = new Set(["degustacao_como", "outros", "pagamento"]);
+export const OPTIONAL_BUFFET_FIELDS = new Set(["degustacao_como", "outros", "pagamento", "promocao"]);
 
 /** Quantos campos importantes já estão preenchidos (Visão geral da IA) */
 export function buffetInfoProgress(extraInstructions: string | null): { filled: number; total: number } {
