@@ -73,9 +73,15 @@ export function AiBuffetInfoSection() {
             }
           >
             <div className="space-y-4">
-              {fields.map((f) => (
-                <div key={f.key} className="space-y-1.5">
-                  <Label className="text-xs font-bold" htmlFor={`ai-f-${f.key}`}>{f.label}</Label>
+              {fields.map((f) => {
+                // Campo importante em branco: destacado para a pessoa achar o que falta
+                const missing = !OPTIONAL_BUFFET_FIELDS.has(f.key) && !(values[f.key] || "").trim();
+                return (
+                <div key={f.key} className={`space-y-1.5 ${missing ? "rounded-xl ring-2 ring-amber-400/70 bg-amber-500/5 p-2 -m-2" : ""}`}>
+                  <Label className="text-xs font-bold flex items-center gap-2" htmlFor={`ai-f-${f.key}`}>
+                    {f.label}
+                    {missing && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">Falta preencher</span>}
+                  </Label>
                   {f.hint && <p className="text-[11px] text-muted-foreground">{f.hint}</p>}
                   {f.type === "select" ? (
                     <SelectOrCustom id={`ai-f-${f.key}`} value={values[f.key] || ""} options={f.options || []} onChange={(v) => setField(f.key, v)}
@@ -88,7 +94,8 @@ export function AiBuffetInfoSection() {
                       className="h-10 text-base sm:text-sm" placeholder={`Ex.: ${f.placeholder}`} />
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </AiCard>
         );
