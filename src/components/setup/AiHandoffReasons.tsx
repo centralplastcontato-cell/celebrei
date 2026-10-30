@@ -1,51 +1,40 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, GraduationCap, Loader2 } from "lucide-react";
+import { CheckCircle2, GraduationCap, Loader2, Users } from "lucide-react";
+import { handoffTeachSource, isTeamTopic } from "@/lib/aiHandoffTopic";
+import { AiTeachDialog, type TeachContext } from "./AiTeachDialog";
 
 const DAYS = 30;
-const OUTROS = "Outras informações";
+// Lista curta; o resto fica em "Ver todos"
+const FIRST = 5;
 
 interface Handoff { id: string; created_at: string; lead_id: string | null; reason: string; name: string | null }
-
-// Respostas ensinadas: só lembrete visual neste navegador (o que vale é o texto da IA)
-const taughtKey = (companyId: string) => `ai_taught_${companyId}`;
-const readTaught = (companyId: string): string[] => {
-  try { return JSON.parse(localStorage.getItem(taughtKey(companyId)) || "[]"); } catch { return []; }
-};
-const writeTaught = (companyId: string, ids: string[]) => {
-  try { localStorage.setItem(taughtKey(companyId), JSON.stringify(ids.slice(-200))); } catch { /* sem armazenamento */ }
-};
-
-/** Junta a resposta ensinada no fim das informações do buffet (o texto que a IA lê) */
-export function appendTaughtAnswer(info: string | null, reason: string, answer: string): string {
-  const line = `Sobre "${reason}": ${answer.trim()}`;
-  const base = (info || "").trim();
-  return base ? `${base}\n${line}` : `${OUTROS}: ${line}`;
-}
 
 /**
  * Por que a IA passou clientes para a equipe (últimos 30 dias), lido do
  * histórico do lead que a IA já grava ("Transferido para a equipe"). Quando
- * era uma dúvida que a IA não sabia, o dono escreve a resposta e ela entra nas
- * informações do buffet — da próxima vez a IA já responde.
+ * era uma dúvida que a IA não sabia, o dono ensina pelo "Ensinar a IA" (a IA
+ * organiza, ele revisa e confirma). Fechamento, pagamento, degustação etc.
+ * são assunto da equipe: sem "Ensinar".
  */
 export function AiHandoffReasons({ companyId }: { companyId: string }) {
   const [items, setItems] = useState<Handoff[] | null>(null);
-  const [taught, setTaught] = useState<string[]>(() => readTaught(companyId));
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [taught, setTaught] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+  const [teaching, setTeaching] = useState<Handoff | null>(null);
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - DAYS * 86400000).toISOString();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    const { data } = await sb.from("lead_history").select("id, created_at, lead_id, new_value")
-      .eq("company_id", companyId).eq("user_name", "IA (beta)").eq("action", "Transferido para a equipe")
-      .gte("created_at", since).order("created_at", { ascending: false }).limit(50);
+    const [{ data }, { data: notes }] = await Promise.all([
+      sb.from("lead_history").select("id, created_at, lead_id, new_value")
+        .eq("company_id", companyId).eq("user_name", "IA (beta)").eq("action", "Transferido para a equipe")
+        .gte("created_at", since).order("created_at", { ascending: false }).limit(50),
+      // Ensinado a partir de uma passagem: vale em qualquer aparelho
+      sb.from("ai_owner_notes").select("source").eq("company_id", companyId).like("source", "passagem:%"),
+    ]);
     const rows = (data || []) as Array<{ id: string; created_at: string; lead_id: string | null; new_value: string | null }>;
     const ids = [...new Set(rows.map((r) => r.lead_id).filter(Boolean))] as string[];
     const names: Record<string, string> = {};
@@ -53,6 +42,7 @@ export function AiHandoffReasons({ companyId }: { companyId: string }) {
       const { data: leads } = await sb.from("campaign_leads").select("id, name").in("id", ids);
       for (const l of (leads || []) as Array<{ id: string; name: string | null }>) if (l.name) names[l.id] = l.name;
     }
+    setTaught(new Set(((notes || []) as Array<{ source: string }>).map((n) => n.source)));
     setItems(rows.map((r) => ({
       id: r.id, created_at: r.created_at, lead_id: r.lead_id,
       reason: (r.new_value || "").replace(/^Motivo:\s*/i, "").trim() || "sem motivo informado",
@@ -61,45 +51,33 @@ export function AiHandoffReasons({ companyId }: { companyId: string }) {
   }, [companyId]);
   useEffect(() => { load(); }, [load]);
 
-  const teach = async (item: Handoff) => {
-    if (answer.trim().length < 3) return;
-    setSaving(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    const { data } = await sb.from("ai_agent_settings").select("extra_instructions").eq("company_id", companyId).maybeSingle();
-    const { error } = data
-      ? await sb.from("ai_agent_settings").update({ extra_instructions: appendTaughtAnswer(data.extra_instructions, item.reason, answer) }).eq("company_id", companyId)
-      : { error: { message: "Responda as perguntas da IA primeiro." } };
-    setSaving(false);
-    if (error) {
-      toast({ title: "Não consegui salvar", description: error.message, variant: "destructive" });
-      return;
-    }
-    const next = [...taught, item.id];
-    setTaught(next);
-    writeTaught(companyId, next);
-    setOpenId(null);
-    setAnswer("");
-    toast({ title: "Pronto! A IA já sabe responder isso" });
-  };
+  // Mesmo objeto enquanto o diálogo está aberto (o diálogo limpa o texto quando o contexto muda)
+  const context = useMemo<TeachContext | null>(
+    () => (teaching ? { motivo: teaching.reason, source: handoffTeachSource(teaching.id) } : null),
+    [teaching],
+  );
 
   if (!items) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+
+  const visible = showAll ? items : items.slice(0, FIRST);
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Toda vez que a IA passa um cliente para a equipe, ela anota o motivo. Se foi uma dúvida que ela não sabia,
-        escreva a resposta: ela passa a fazer parte das informações da IA e da próxima vez ela mesma responde.
+        toque em "Ensinar" e explique: da próxima vez ela mesma responde. Fechamento, pagamento, degustação e afins
+        são assunto da equipe: a IA passou certo.
       </p>
       {items.length === 0 ? (
         <p className="rounded-md bg-muted/60 p-3 text-sm text-muted-foreground">Nos últimos {DAYS} dias a IA não passou nenhum cliente para a equipe.</p>
       ) : (
-        <ul className="space-y-2">
-          {items.map((it) => {
-            const done = taught.includes(it.id);
-            return (
-              <li key={it.id} className="space-y-2 rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-2">
+        <>
+          <ul className="space-y-2">
+            {visible.map((it) => {
+              const done = taught.has(handoffTeachSource(it.id));
+              const team = isTeamTopic(it.reason);
+              return (
+                <li key={it.id} className="flex items-start justify-between gap-2 rounded-lg border p-3">
                   <div className="min-w-0">
                     <p className="text-sm">{it.reason}</p>
                     <p className="text-xs text-muted-foreground">
@@ -109,30 +87,33 @@ export function AiHandoffReasons({ companyId }: { companyId: string }) {
                   </div>
                   {done ? (
                     <span className="flex shrink-0 items-center gap-1 text-xs text-green-700"><CheckCircle2 className="h-3.5 w-3.5" /> Ensinado</span>
-                  ) : openId !== it.id && (
-                    <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => { setOpenId(it.id); setAnswer(""); }}>
+                  ) : team ? (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                      <Users className="h-3 w-3" /> assunto da equipe
+                    </span>
+                  ) : (
+                    <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setTeaching(it)}>
                       <GraduationCap className="mr-1.5 h-3.5 w-3.5" /> Ensinar
                     </Button>
                   )}
-                </div>
-                {openId === it.id && (
-                  <div className="space-y-2">
-                    <Textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={3} className="text-base" maxLength={500}
-                      aria-label="Resposta para a IA" placeholder="Escreva a resposta como você explicaria para a cliente. Ex.: Sim, pode levar o pet, desde que fique na coleira." />
-                    <p className="text-[11px] text-muted-foreground">Não escreva valores aqui: valores ficam só na tabela de Valores.</p>
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" disabled={saving || answer.trim().length < 3} onClick={() => teach(it)}>
-                        {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Salvar resposta
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => setOpenId(null)}>Cancelar</Button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+          {items.length > FIRST && (
+            <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? "Mostrar menos" : `Ver todos (${items.length})`}
+            </Button>
+          )}
+        </>
       )}
+      <AiTeachDialog
+        open={!!teaching}
+        onOpenChange={(v) => { if (!v) setTeaching(null); }}
+        companyId={companyId}
+        context={context}
+        onSaved={load}
+      />
     </div>
   );
 }
