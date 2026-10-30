@@ -68,18 +68,16 @@ export function AiPromotionSection() {
     write(p, empty ? "Promoção removida" : "Promoção salva — a IA já passa a oferecer");
   };
 
-  const useIdea = (idea: PromotionIdea) => {
-    const filled = p.nome.trim() || p.beneficio.trim();
-    if (filled && !confirm(`Trocar o que está preenchido pela ideia "${idea.nome}"?`)) return;
-    setP((prev) => ideaToForm(idea, prev));
-  };
+  // Sem pergunta: dá para ir tocando nas ideias só para ver. Nada salva até "Salvar",
+  // e o "Desfazer" da barra de baixo volta ao que estava.
+  const useIdea = (idea: PromotionIdea) => setP((prev) => ideaToForm(idea, prev));
 
   return (
     <div className="space-y-4">
       <AiCard
         icon={<Lightbulb className="h-4 w-4 text-amber-500" />}
         title="Ideias de promoção"
-        description="Toque numa ideia para preencher. Depois ajuste o que o cliente ganha do jeito do seu buffet e escolha até quando vale."
+        description="Toque numa ideia para ver como fica (só salva quando clicar em Salvar). Depois ajuste o que o cliente ganha do jeito do seu buffet e escolha até quando vale."
       >
         <div className="flex flex-wrap gap-2">
           {PROMOTION_IDEAS.map((idea) => (
