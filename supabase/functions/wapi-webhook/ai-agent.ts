@@ -51,6 +51,7 @@ import { askedForName, nameFromAnswer } from "../_shared/name-answer.ts";
 import { falseMaterialClaims, hasMaterialClaim, hasSubstance, refersToMaterial, stripFalseMaterialClaims } from "../_shared/material-claims.ts";
 import { enforceHouseRules, houseRuleNote, houseRuleViolatingSentences, houseRuleViolations, parseHouseRules, topicsAsked, TOPIC_ASK } from "../_shared/house-rules.ts";
 import { resumeNote } from "../_shared/ai-resume.ts";
+import { fetchSocialPost, socialPostNote, socialPostUrl } from "../_shared/social-post.ts";
 
 type Json = Record<string, unknown>;
 
@@ -2220,6 +2221,25 @@ async function processIncomingMedia(
   });
 }
 
+// Link de post do Instagram/Facebook/TikTok: busca o título e o texto do post
+// e guarda na própria mensagem, para a IA saber de que post o cliente fala.
+async function processIncomingSocialPost(supabase: any, conv: AgentConv, content: string, messageId: string): Promise<void> {
+  const url = socialPostUrl(content);
+  if (!url) return;
+  const post = await fetchSocialPost(url);
+  if (!post) {
+    console.log(`[AI Agent] Post de rede social sem prévia (conv ${conv.id}): ${url}`);
+    return;
+  }
+  const { data: row } = await supabase.from('wapi_messages').select('id, metadata')
+    .eq('conversation_id', conv.id).eq('message_id', messageId).maybeSingle();
+  if (!row?.id) return;
+  await supabase.from('wapi_messages').update({
+    metadata: { ...((row.metadata as Json) || {}), ai_link_text: socialPostNote(post) },
+  }).eq('id', row.id);
+  console.log(`[AI Agent] Post do ${post.network} lido (conv ${conv.id}): "${post.caption.slice(0, 80)}"`);
+}
+
 // Ponto de entrada. Retorna true quando a IA cuidou da mensagem (o bot fixo não roda).
 export async function maybeHandleWithAiAgent(
   supabase: any,
@@ -2402,6 +2422,8 @@ export async function maybeHandleWithAiAgent(
 
     if (media) {
       await processIncomingMedia(supabase, instance, conv, media, openaiKey, isAiTestPhone);
+    } else if (incomingMessageId && socialPostUrl(content)) {
+      await processIncomingSocialPost(supabase, conv, content, incomingMessageId);
     }
 
     // Junta mensagens seguidas: espera alguns segundos e só responde se esta
@@ -2462,7 +2484,8 @@ export async function maybeHandleWithAiAgent(
       .filter((m) => (m.content || '').trim().length > 0 || m.message_type !== 'text')
       .map((m) => {
         if (m.message_type === 'text') {
-          return { role: m.from_me ? 'assistant' : 'user', content: `${byTeam(m) ? '[Equipe] ' : ''}${m.content || ''}` } as ChatTurn;
+          const linkNote = !m.from_me && typeof m.metadata?.ai_link_text === 'string' ? `\n${m.metadata.ai_link_text}` : '';
+          return { role: m.from_me ? 'assistant' : 'user', content: `${byTeam(m) ? '[Equipe] ' : ''}${m.content || ''}${linkNote}` } as ChatTurn;
         }
         if (!m.from_me && (m.message_type === 'audio' || m.message_type === 'image')) {
           return { role: 'user', content: mediaHistoryText(m.message_type, m.content || '', m.metadata?.ai_media_text as string | undefined) } as ChatTurn;
