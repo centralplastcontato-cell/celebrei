@@ -3437,7 +3437,9 @@ async function processVamuOffers({ supabase }: { supabase: SupabaseAdmin }): Pro
     if (mode === "test" && settings.vamu3d_offer_test_sent_at) continue;
     try {
       const { data: ai } = await supabase.from("ai_agent_settings").select("team_hours").eq("company_id", companyId).maybeSingle();
-      if (!isOpenAt(parseVisitHours(teamHoursText(ai?.team_hours)), nowMs) || localHour < 9 || localHour >= 20) continue;
+      // Teste (só para o dono): qualquer hora entre 9h e 20h; famílias: só no horário da equipe
+      if (localHour < 9 || localHour >= 20) continue;
+      if (mode === "on" && !isOpenAt(parseVisitHours(teamHoursText(ai?.team_hours)), nowMs)) continue;
 
       // Já mandadas (uma por festa) e o limite do dia
       const { data: offered } = await supabase.from("lead_history").select("new_value, created_at")
