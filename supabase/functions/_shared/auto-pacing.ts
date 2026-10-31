@@ -20,7 +20,7 @@ export const POST_VISIT_HOLD_DAYS = 7;
 export function isPacedAutomatic(metadata: Record<string, unknown> | null | undefined): boolean {
   const m = metadata || {};
   const source = typeof m.source === "string" ? m.source : "";
-  if (source === "auto_reminder" || source === "reactivation_engine" || source === "post_visit" || source === "scheduled_return") return true;
+  if (source === "auto_reminder" || source === "reactivation_engine" || source === "post_visit" || source === "scheduled_return" || source === "vamu_offer") return true;
   // Follow-up da jornada da IA (as respostas dela ao cliente não contam)
   return source === "ai_agent" && typeof m.ai_followup === "string" && m.ai_followup !== "";
 }

@@ -33,3 +33,31 @@ Deno.test("vamuOrderSummary, vamuOrderTag e isUuid", () => {
   assertEquals(isUuid(ID), true);
   assertEquals(isUuid("K7X2P"), false);
 });
+
+Deno.test("oferta: nomes limpos, idade e só festa de aniversário", async () => {
+  const { cleanFirstName, partyAge, isBirthdayParty, vamuOfferTag, vamuOfferEventId } = await import("./vamu.ts");
+  assertEquals(cleanFirstName(" Lívia 02 anos"), "Lívia");
+  assertEquals(cleanFirstName("MIGUEL GLAUSER TOLENTINO"), "Miguel");
+  assertEquals(cleanFirstName("Thaís Festa. 14.11.2026 ."), "Thaís");
+  assertEquals(cleanFirstName("MaríLia"), "Marília");
+  assertEquals(cleanFirstName("Fabiana 05.12.26"), "Fabiana");
+  assertEquals(cleanFirstName("5515999990000"), "");
+  assertEquals(partyAge("6", "Noah"), 6);
+  assertEquals(partyAge(null, " Kauã 08 anos"), 8);
+  assertEquals(partyAge("2 anos", "Vinicius"), 2);
+  assertEquals(partyAge(null, "Francisco"), null);
+  assertEquals(isBirthdayParty("Festa do Eduardo", "EDUARDO"), true);
+  for (const t of ["Formatura Colégio EMEB", "COLÉGIO AUGE", "Clubinho Arte e Brinca", "Escola Maternita", "E.M. Prof.ª Renice Seraphim"]) {
+    assertEquals(isBirthdayParty(t, t), false);
+  }
+  assertEquals(vamuOfferEventId(`texto ${vamuOfferTag(ID)}`), ID);
+});
+
+Deno.test("oferta: mensagem sem do/da e com o link no fim", async () => {
+  const { vamuOfferMessage } = await import("./vamu.ts");
+  const msg = vamuOfferMessage({ parentName: "Mariana", childName: "Eduardo", companyName: "Castelo da Diversão", link: "https://vamu3d.com.br/castelo?nome=Eduardo" });
+  assertEquals(msg.startsWith("Oi, Mariana! 🎉 A festa está chegando!"), true);
+  assertEquals(msg.includes("com o nome de Eduardo"), true);
+  assertEquals(msg.endsWith("https://vamu3d.com.br/castelo?nome=Eduardo"), true);
+  assertEquals(vamuOfferMessage({ parentName: "", childName: "", companyName: "X", link: "L" }).startsWith("Oi! 🎉"), true);
+});

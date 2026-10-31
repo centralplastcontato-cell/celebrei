@@ -85,3 +85,49 @@ export function vamuOrderSummary(o: VamuOrder): string {
   const who = [o.childName, o.childAge ? `${o.childAge} anos` : null].filter(Boolean).join(", ");
   return `${what}${qty}${who ? ` · ${who}` : ""}`;
 }
+
+// ── Oferta automática (uma mensagem por festa) ───────────────────────────────
+// A família recebe UMA mensagem com o link já preenchido quando a festa entra
+// na janela de 40 a 4 dias antes (festa fechada em cima da hora recebe logo).
+// Escola, colégio, formatura etc. não são aniversário: ficam de fora.
+
+export const VAMU_OFFER_MAX_DAYS = 40;
+export const VAMU_OFFER_MIN_DAYS = 4;
+export const VAMU_OFFER_DAILY_CAP = 6;
+export const VAMU_OFFER_ACTION = "Oferta Vamu 3D enviada";
+
+/** Marca da oferta no histórico do lead (uma por festa) */
+export const vamuOfferTag = (eventId: string) => `#vamu-oferta-${eventId}`;
+export const vamuOfferEventId = (text: string | null | undefined): string | null =>
+  String(text || "").match(/#vamu-oferta-([0-9a-f-]{36})/i)?.[1] || null;
+
+const NON_BIRTHDAY_RE = /(escola|col[eé]gio|formatura|clubinho|creche|emeb|\be\.\s?m\.|ber[cç][aá]rio|empresa|confraterniza|corporativ)/i;
+
+/** Festa de aniversário (não evento de escola, formatura, empresa…) */
+export function isBirthdayParty(title: string | null | undefined, childName: string | null | undefined): boolean {
+  return !NON_BIRTHDAY_RE.test(`${title || ""} ${childName || ""}`);
+}
+
+const properCase = (w: string) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : "");
+
+/** " Lívia 02 anos" → "Lívia"; "MIGUEL GLAUSER" → "Miguel"; "Thaís Festa. 14.11.2026 ." → "Thaís" */
+export function cleanFirstName(raw: string | null | undefined): string {
+  const first = String(raw || "").replace(/\d+\s*anos?\b/gi, " ").replace(/[\d./()-]+/g, " ").trim().split(/\s+/)[0] || "";
+  return /^[\p{L}']+$/u.test(first) ? properCase(first) : "";
+}
+
+/** Idade da festa: o campo de idade ou o número no nome ("Lívia 02 anos") */
+export function partyAge(childAge: string | number | null | undefined, childName: string | null | undefined): number | null {
+  const from = (v: unknown) => Number(String(v ?? "").match(/\d+/)?.[0]);
+  const a = from(childAge);
+  if (Number.isInteger(a) && a > 0 && a < 30) return a;
+  const b = from(String(childName || "").match(/\d+\s*anos?/i)?.[0]);
+  return Number.isInteger(b) && b > 0 && b < 30 ? b : null;
+}
+
+/** A mensagem da oferta (sem "do/da": não dá para saber o gênero pelo nome) */
+export function vamuOfferMessage(p: { parentName: string; childName: string; companyName: string; link: string }): string {
+  const hello = p.parentName ? `Oi, ${p.parentName}! 🎉` : "Oi! 🎉";
+  const who = p.childName ? `com o nome de ${p.childName}` : "com o nome do aniversariante";
+  return `${hello} A festa está chegando!\n\nSabia que dá para ter lembrancinhas, topo de bolo e outras peças ${who}, feitas em 3D? É com a Vamu 3D, parceira do ${p.companyName} 👇\n\n${p.link}`;
+}

@@ -38,7 +38,7 @@ const MAX_SENDS_PER_RUN = 5;
 // de envio duplo quando duas execuções do cron se sobrepõem
 const LOCK_MS = 30 * 60000;
 const MATERIAL_WINDOW_MS = 30 * 86400000;
-const OTHER_AUTOMATED_SOURCES = new Set(["auto_reminder", "reactivation_engine", "visit_confirmation", "campaign_auto_reply", "system_alert", "reaction"]);
+const OTHER_AUTOMATED_SOURCES = new Set(["auto_reminder", "reactivation_engine", "visit_confirmation", "campaign_auto_reply", "system_alert", "reaction", "vamu_offer"]);
 const MEDIA_KIND: Record<string, MaterialKind> = { image: "fotos", video: "video", document: "pacotes" };
 const MEDIA_TEXT: Record<string, string> = { image: "[foto do espaço enviada]", video: "[vídeo enviado]", document: "[PDF de pacotes enviado]", audio: "[áudio]" };
 

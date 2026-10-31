@@ -14,7 +14,7 @@ type Db = any;
 type Json = Record<string, any>;
 
 // Nossas mensagens que não são nem da IA nem de uma pessoa da equipe
-const OTHER_AUTOMATED_SOURCES = new Set(["auto_reminder", "reactivation_engine", "visit_confirmation", "campaign_auto_reply", "system_alert", "reaction", "post_visit"]);
+const OTHER_AUTOMATED_SOURCES = new Set(["auto_reminder", "reactivation_engine", "visit_confirmation", "campaign_auto_reply", "system_alert", "reaction", "post_visit", "vamu_offer"]);
 const MAX_AGE_DAYS = 14;
 
 const ymdBR = (ms: number) => new Date(ms - 3 * 3600000).toISOString().slice(0, 10);

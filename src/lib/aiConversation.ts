@@ -30,7 +30,7 @@ export const AI_STATE_LABEL: Record<AiConversationState, string> = {
 // ── "Responder": a IA passou a conversa e ninguém da equipe escreveu ainda ──
 
 // Mensagens nossas que não são de uma pessoa da equipe (mesma regra do servidor)
-const AUTOMATED_SOURCES = new Set(["auto_reminder", "campaign_auto_reply", "system_alert", "ai_agent", "reactivation_engine", "visit_confirmation", "reaction"]);
+const AUTOMATED_SOURCES = new Set(["auto_reminder", "campaign_auto_reply", "system_alert", "ai_agent", "reactivation_engine", "visit_confirmation", "reaction", "vamu_offer"]);
 // Até aqui as mensagens da IA saíam gravadas como "platform" (iguais às da equipe)
 const AI_SOURCE_MARKED_SINCE = Date.parse("2026-10-05T23:10:00Z");
 
