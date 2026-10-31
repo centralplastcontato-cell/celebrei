@@ -556,6 +556,21 @@ import { senderDot, senderTag } from "@/lib/messageSender";
 import { ClientDataBar } from "./ClientDataBar";
 import { type ClientDataRequestRow, clientDataLabel, clientDataState, latestClientDataByLead } from "@/lib/clientDataRequest";
 
+/** Figurinha; endereço expirado (figurinhas antigas) vira 🎭 em vez da imagem quebrada */
+function StickerImage({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div className="text-2xl">🎭</div>;
+  return (
+    <img
+      src={src}
+      alt="Figurinha"
+      className="w-32 h-32 object-contain bg-transparent"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function WhatsAppChat({ userId, allowedUnits, initialPhone, initialConversationId, initialDraft, onPhoneHandled, externalSelectedUnit, onInstancesLoaded, onLeadClosedMobile, onUnreadCountChange, isVisible = true, onConversationOpenChange, onActiveUnitChange }: WhatsAppChatProps) {
   const { currentCompany } = useCompany();
   const { canViewAllInstances, allowedInstanceIds, isLoading: isLoadingInstancePerms } = useInstancePermissions(userId);
@@ -6347,12 +6362,7 @@ const hasCampaignReply = (conv: { bot_data?: Record<string, unknown> | null } | 
                                  )}
                                  {msg.message_type === 'sticker' && (
                                    msg.media_url && !msg.media_url.includes('.enc') ? (
-                                     <img
-                                       src={msg.media_url}
-                                       alt="Figurinha"
-                                       className="w-32 h-32 object-contain bg-transparent"
-                                       loading="lazy"
-                                     />
+                                     <StickerImage src={msg.media_url} />
                                    ) : (
                                      <div className="text-2xl">🎭</div>
                                    )
@@ -7479,12 +7489,7 @@ const hasCampaignReply = (conv: { bot_data?: Record<string, unknown> | null } | 
                             )}
                             {msg.message_type === 'sticker' && (
                               msg.media_url && !msg.media_url.includes('.enc') ? (
-                                <img
-                                  src={msg.media_url}
-                                  alt="Figurinha"
-                                  className="w-32 h-32 object-contain bg-transparent"
-                                  loading="lazy"
-                                />
+                                <StickerImage src={msg.media_url} />
                               ) : (
                                 <div className="text-2xl">🎭</div>
                               )
