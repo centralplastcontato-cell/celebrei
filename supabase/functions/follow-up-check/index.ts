@@ -31,6 +31,7 @@ import { installEvolutionCallGuard } from "../_shared/evolution-guard.ts";
 import { claimSystemSendSlot } from "../_shared/system-send-pacing.ts";
 import { PARTY_SOON_ACTION, partySoon, partySoonLabel } from "../_shared/party-soon.ts";
 import { pacingHeldLeads } from "../_shared/auto-pacing.ts";
+import { cleanFirstName, isBirthdayParty, partyAge, VAMU_OFFER_ACTION, VAMU_OFFER_DAILY_CAP, VAMU_OFFER_MAX_DAYS, VAMU_OFFER_MIN_DAYS, vamuOfferEventId, vamuOfferMessage, vamuOfferTag, vamuPartyLink } from "../_shared/vamu.ts";
 import { type AutoFormType, FORM_AUTO_DEFAULT_DELAY_MIN, FORM_AUTO_DEFAULT_MESSAGES, FORM_AUTO_MAX_LATE_MS, FORM_SENT_ACTION, formAutoDue, formAutoLink, formAutoPath, formSentRecord, type FormTemplateRow, partyEndMs, partyStartMs, pickCardapioTemplate, prefestaDue } from "../_shared/form-auto.ts";
 import { clientDataLink, clientDataThanks, DEFAULT_CLIENT_DATA_MESSAGE, DEFAULT_CLIENT_DATA_REMINDERS, dueReminder, fillClientDataTemplate, hasCpfInText, isOverdue, normalizeReminderHours, shortClientToken } from "../_shared/client-data.ts";
 
@@ -472,6 +473,14 @@ Deno.serve(async (req) => {
       if (postVisit.errors.length > 0) console.error("[follow-up-check] Erros no pós-visita:", postVisit.errors);
     } catch (err) {
       console.error("[follow-up-check] Erro no pós-visita:", err);
+    }
+    // Oferta da Vamu 3D: uma mensagem por festa, com o link já preenchido
+    try {
+      const vamu = await processVamuOffers({ supabase });
+      if (vamu.sent > 0) console.log(`[follow-up-check] Oferta Vamu: ${vamu.sent} mensagem(ns)`);
+      if (vamu.errors.length > 0) console.error("[follow-up-check] Erros na oferta Vamu:", vamu.errors);
+    } catch (err) {
+      console.error("[follow-up-check] Erro na oferta Vamu:", err);
     }
     if (clientDataResult.errors.length > 0) {
       console.error("[follow-up-check] Erros nos dados do contratante:", clientDataResult.errors);
@@ -3397,6 +3406,130 @@ async function processPostVisit({ supabase }: { supabase: SupabaseAdmin }): Prom
       }
     } catch (err) {
       errors.push(`empresa ${companyId}: ${String(err)}`);
+    }
+  }
+  return { sent, errors };
+}
+
+// Oferta da Vamu 3D (parceira de lembrancinhas, Castelo 31/10): UMA mensagem
+// por festa de aniversário, com o link já preenchido, quando a festa entra na
+// janela de 40 a 4 dias antes. Ligada em companies.settings.vamu3d_offer:
+// "test" manda uma amostra só para vamu3d_offer_test_phone; "on" manda para as
+// famílias (até 6 por dia, uma por rodada, das festas mais próximas). Só no
+// horário da equipe, no mesmo número da conversa, no ritmo seguro de envio.
+async function processVamuOffers({ supabase }: { supabase: SupabaseAdmin }): Promise<{ sent: number; errors: string[] }> {
+  const errors: string[] = [];
+  let sent = 0;
+  const { data: companies, error } = await supabase.from("companies").select("id, name, settings").eq("settings->>vamu3d", "true");
+  if (error || !companies || companies.length === 0) return { sent, errors: error ? [String(error.message)] : [] };
+
+  const nowMs = Date.now();
+  const todayYmd = new Date(nowMs - 3 * 3600000).toISOString().slice(0, 10);
+  const localHour = Number(new Date(nowMs).toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false })) % 24;
+  const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+  const isBlocked = await loadBlockedContacts(supabase);
+
+  for (const company of companies as Array<{ id: string; name: string | null; settings: Record<string, any> | null }>) {
+    const companyId = company.id;
+    const settings = company.settings || {};
+    const mode = String(settings.vamu3d_offer || "off");
+    if (mode !== "test" && mode !== "on") continue;
+    if (mode === "test" && settings.vamu3d_offer_test_sent_at) continue;
+    try {
+      const { data: ai } = await supabase.from("ai_agent_settings").select("team_hours").eq("company_id", companyId).maybeSingle();
+      if (!isOpenAt(parseVisitHours(teamHoursText(ai?.team_hours)), nowMs) || localHour < 9 || localHour >= 20) continue;
+
+      // Já mandadas (uma por festa) e o limite do dia
+      const { data: offered } = await supabase.from("lead_history").select("new_value, created_at")
+        .eq("company_id", companyId).eq("action", VAMU_OFFER_ACTION).gte("created_at", new Date(nowMs - 90 * 86400000).toISOString()).limit(2000);
+      const offeredEvents = new Set(((offered || []) as any[]).map((h) => vamuOfferEventId(h.new_value)).filter(Boolean));
+      const sentToday = ((offered || []) as any[]).filter((h) => new Date(Date.parse(h.created_at) - 3 * 3600000).toISOString().slice(0, 10) === todayYmd).length;
+      if (mode === "on" && sentToday >= VAMU_OFFER_DAILY_CAP) continue;
+
+      const { data: events } = await supabase.from("company_events")
+        .select("id, lead_id, title, child_name, child_age, event_date, status")
+        .eq("company_id", companyId).not("lead_id", "is", null).neq("status", "cancelado")
+        .gte("event_date", addDays(todayYmd, VAMU_OFFER_MIN_DAYS)).lte("event_date", addDays(todayYmd, VAMU_OFFER_MAX_DAYS))
+        .order("event_date", { ascending: true }).limit(200);
+      const pending = ((events || []) as any[]).filter((e) => !offeredEvents.has(e.id) && isBirthdayParty(e.title, e.child_name));
+      if (pending.length === 0) continue;
+      // Quem já pediu na Vamu não recebe a oferta
+      const { data: ordered } = await supabase.from("lead_history").select("lead_id")
+        .eq("action", "Pedido Vamu 3D").in("lead_id", [...new Set(pending.map((e) => e.lead_id))]);
+      const orderedLeads = new Set(((ordered || []) as any[]).map((o) => o.lead_id));
+
+      for (const ev of pending) {
+        if (orderedLeads.has(ev.lead_id)) continue;
+        const { data: convs } = await supabase.from("wapi_conversations")
+          .select("id, instance_id, remote_jid, contact_phone, contact_name")
+          .eq("lead_id", ev.lead_id).not("remote_jid", "like", "%@g.us%").order("last_message_at", { ascending: false }).limit(1);
+        const conv = ((convs || []) as any[])[0];
+        if (!conv) continue;
+        const { data: inst } = await supabase.from("wapi_instances")
+          .select("id, instance_id, instance_token, client_token, provider, company_id, unit, status, is_active")
+          .eq("id", conv.instance_id).maybeSingle();
+        if (!inst || inst.company_id !== companyId || inst.is_active === false || inst.status !== "connected") continue;
+        const familyPhone = String(conv.contact_phone || conv.remote_jid || "").replace(/@.*/, "").replace(/\D/g, "");
+        const testPhone = String(settings.vamu3d_offer_test_phone || "").replace(/\D/g, "");
+        const phone = mode === "test" ? testPhone : familyPhone;
+        if (phone.length < 10) {
+          if (mode === "test") errors.push("oferta Vamu: vamu3d_offer_test_phone não configurado");
+          if (mode === "test") break;
+          continue;
+        }
+        if (isBlocked(companyId, mode === "test" ? phone : conv.remote_jid)) continue;
+        if (mode === "on" && (await pacingHeldLeads(supabase, companyId, [ev.lead_id])).has(ev.lead_id)) continue;
+
+        const { data: lead } = await supabase.from("campaign_leads").select("name").eq("id", ev.lead_id).maybeSingle();
+        const childName = cleanFirstName(ev.child_name || ev.title);
+        const link = vamuPartyLink({ id: ev.id, child_name: childName, child_age: partyAge(ev.child_age, ev.child_name), event_date: ev.event_date }, "oferta");
+        const text = vamuOfferMessage({
+          parentName: cleanFirstName(lead?.name || conv.contact_name), childName, companyName: String(company.name || "buffet"), link,
+        });
+
+        const tag = vamuOfferTag(ev.id);
+        let claimId: string | null = null;
+        if (mode === "on") {
+          // Reserva a festa antes de enviar (duas rodadas juntas não mandam duas vezes)
+          const { data: claim } = await supabase.from("lead_history").insert({
+            lead_id: ev.lead_id, company_id: companyId, user_name: "Sistema", action: VAMU_OFFER_ACTION, new_value: `${text.slice(0, 160)} ${tag}`,
+          }).select("id").maybeSingle();
+          claimId = claim?.id || null;
+          const { data: dup } = await supabase.from("lead_history").select("id").eq("lead_id", ev.lead_id).eq("action", VAMU_OFFER_ACTION).ilike("new_value", `%${tag}%`);
+          if (!claimId || (dup || []).length > 1) {
+            if (claimId) await supabase.from("lead_history").delete().eq("id", claimId);
+            continue;
+          }
+        }
+        const release = async () => { if (claimId) await supabase.from("lead_history").delete().eq("id", claimId); };
+
+        const slot = await claimSystemSendSlot(supabase, { id: inst.id, provider: inst.provider });
+        if (!slot.ok) { await release(); break; }
+        const body = mode === "test" ? `🧪 Teste da oferta da Vamu (só para você). Assim chega para os pais:\n\n${text}` : text;
+        const res = await providerSendText(inst as any, phone, body);
+        if (!res.ok) {
+          await release();
+          errors.push(`oferta Vamu (festa ${ev.id}): ${res.error}`);
+          break;
+        }
+        if (mode === "test") {
+          await supabase.from("companies").update({ settings: { ...settings, vamu3d_offer_test_sent_at: new Date().toISOString() } }).eq("id", companyId);
+          console.log(`[follow-up-check] Oferta Vamu: teste enviado (festa ${ev.id})`);
+        } else {
+          const nowIso = new Date().toISOString();
+          await supabase.from("wapi_messages").upsert({
+            conversation_id: conv.id, message_id: res.messageId || `vamu_offer_${Date.now()}`,
+            from_me: true, message_type: "text", content: text, status: "sent", timestamp: nowIso, company_id: companyId,
+            metadata: { source: "vamu_offer", event_id: ev.id },
+          }, { onConflict: "conversation_id,message_id", ignoreDuplicates: true });
+          await supabase.from("wapi_conversations").update({ last_message_at: nowIso, last_message_content: text.substring(0, 100), last_message_from_me: true }).eq("id", conv.id);
+          console.log(`[follow-up-check] Oferta Vamu enviada (festa ${ev.id}, ${ev.event_date})`);
+        }
+        sent++;
+        break; // uma por rodada (a cada 5 min): espaça os envios
+      }
+    } catch (err) {
+      errors.push(`oferta Vamu (empresa ${companyId}): ${String(err)}`);
     }
   }
   return { sent, errors };
