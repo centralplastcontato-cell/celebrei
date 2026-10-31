@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from "../_shared/social-post.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -121,10 +123,9 @@ Deno.serve(async (req) => {
       getMetaContent("description") ||
       null;
 
-    let image =
-      getMetaContent("og:image") ||
-      getMetaContent("twitter:image") ||
-      null;
+    // "&amp;" no endereço da imagem (Instagram) quebra a assinatura e a foto não abre
+    const rawImage = getMetaContent("og:image") || getMetaContent("twitter:image") || null;
+    let image = rawImage ? decodeHTMLEntities(rawImage) : null;
 
     // Resolve relative image URLs
     if (image && !image.startsWith("http")) {
@@ -139,11 +140,15 @@ Deno.serve(async (req) => {
       getMetaContent("og:site_name") ||
       parsedUrl.hostname.replace(/^www\./, "");
 
+    // Instagram/Facebook não deixam a foto aparecer em outro site e o endereço
+    // expira em dias: a foto vem junto, já baixada (só se for pequena)
+    if (image) image = (await inlineImage(image)) || image;
+
     const result = {
       title: decodeHTMLEntities(title),
       description: description ? decodeHTMLEntities(description) : null,
       image,
-      siteName,
+      siteName: decodeHTMLEntities(siteName),
       url: parsedUrl.toString(),
     };
 
@@ -163,13 +168,25 @@ Deno.serve(async (req) => {
   }
 });
 
-function decodeHTMLEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/");
+const decodeHTMLEntities = decodeHtmlEntities;
+
+const MAX_INLINE_IMAGE = 400 * 1024;
+
+/** Foto da prévia como data: (até 400 KB); null se não der para baixar */
+async function inlineImage(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "facebookexternalhit/1.1", "Accept": "image/*" },
+      signal: AbortSignal.timeout(5000),
+    });
+    const type = (res.headers.get("content-type") || "").split(";")[0].trim();
+    if (!res.ok || !/^image\/(jpeg|png|webp|gif)$/i.test(type)) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_INLINE_IMAGE) return null;
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return `data:${type};base64,${btoa(bin)}`;
+  } catch {
+    return null;
+  }
 }
